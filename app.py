@@ -317,7 +317,7 @@ ASSESSMENT_SECTIONS = [
                 'input_type': 'text',
                 'label': 'Nghề nghiệp / lĩnh vực',
                 'placeholder': 'VD: Marketing, Sinh viên, Kinh doanh…',
-                'required': False
+                'required': True
             },
             {
                 'id': 'referrer',
@@ -325,7 +325,7 @@ ASSESSMENT_SECTIONS = [
                 'input_type': 'text',
                 'label': 'Tên người giới thiệu (nếu có)',
                 'placeholder': 'Để trống nếu không có',
-                'required': False
+                'required': True
             },
         ]
     },
@@ -604,7 +604,7 @@ ASSESSMENT_SECTIONS = [
                 'type': 'textarea',
                 'label': 'Mục tiêu bạn mong muốn cải thiện sau đánh giá này?',
                 'placeholder': 'VD: Ngủ ngon hơn, giảm căng thẳng, vận động đều…',
-                'required': False
+                'required': True
             },
             {
                 'id': 'want_coaching',
@@ -896,6 +896,21 @@ def assessment():
                 qid = q['id']
                 val = request.form.get(qid, '').strip()
                 raw[qid] = val
+
+        missing = [
+            q['label'] for section in ASSESSMENT_SECTIONS
+            for q in section['questions']
+            if q.get('required') and not raw.get(q['id'])
+        ]
+        if missing:
+            flash('Vui lòng hoàn thành tất cả câu hỏi bắt buộc trước khi xem bản đồ.', 'error')
+            return render_template(
+                'assessment.html',
+                sections=ASSESSMENT_SECTIONS,
+                pillar_names=PILLAR_NAMES,
+                name=raw.get('name') or 'Bạn',
+                is_guest=('user' not in session)
+            )
 
         scores = compute_scores(raw)
 

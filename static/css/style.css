@@ -151,6 +151,13 @@ h1, h2, h3 { font-weight: 700; line-height: 1.25; color: var(--text); }
 }
 .page-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.3rem; letter-spacing: -0.02em; }
 .page-subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.4rem; }
+.map-preview-image {
+  display: block;
+  width: min(420px, 100%);
+  height: auto;
+  margin: 0 auto;
+  filter: drop-shadow(0 12px 32px rgba(49, 92, 80, 0.12));
+}
 
 /* ===== CARDS (app-wide) ===== */
 .card {
@@ -967,10 +974,12 @@ h1, h2, h3 { font-weight: 700; line-height: 1.25; color: var(--text); }
   display: flex;
   justify-content: center;
   margin: 0.4rem 0 1rem;
-  max-width: 280px;
+  width: 100%;
+  max-width: 420px;
   margin-left: auto;
   margin-right: auto;
 }
+.radar-container canvas { width: 100% !important; height: auto !important; }
 .score-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -987,6 +996,15 @@ h1, h2, h3 { font-weight: 700; line-height: 1.25; color: var(--text); }
 .score-item .value { font-size: 1.1rem; font-weight: 800; color: var(--forest); }
 .score-item.low .value { color: #E07A5F; }
 .score-item.high .value { color: #4CAF7A; }
+
+@media (max-width: 520px) {
+  .container { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .page-title { font-size: 1.3rem; }
+  .card { padding: 1rem 0.85rem; }
+  .score-grid { gap: 0.35rem; }
+  .score-item { padding-left: 0.2rem; padding-right: 0.2rem; }
+  .score-item .name { font-size: 0.62rem; }
+}
 
 .quick-actions {
   display: grid;

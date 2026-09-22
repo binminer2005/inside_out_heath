@@ -162,6 +162,15 @@
     font-size: 0.8rem; color: #8B5A4A; line-height: 1.45; text-align: center;
   }
   .assess-safety strong { display: block; margin-bottom: 0.1rem; }
+
+  @media (max-width: 520px) {
+    .assess-wrap { width: 100%; }
+    .section-card { padding: 1rem 0.85rem; }
+    .assess-nav { position: sticky; bottom: 0.5rem; z-index: 5; }
+    .assess-nav .btn { min-width: 0; padding: 0.7rem 0.55rem; font-size: 0.86rem; }
+    .choice-opt .opt-box { padding: 0.7rem 0.75rem; font-size: 0.86rem; }
+    .q-label { font-size: 0.9rem; }
+  }
 </style>
 {% endblock %}
 
