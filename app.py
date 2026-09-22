@@ -9,7 +9,10 @@ import json
 from copy import deepcopy
 
 app = Flask(__name__)
-app.secret_key = 'insideout-health-demo-secret-key-2026-v4'
+app.secret_key = os.environ.get(
+    'SECRET_KEY',
+    'insideout-health-demo-development-key'
+)
 
 # ─── Persistence (local JSON) ───────────────────────────────────────────────
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
