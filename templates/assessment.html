@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block title %}Vẽ Bản đồ Tâm – Thể{% endblock %}
+
+{% block head %}
+<style>
+  .assess-wrap { max-width: 520px; margin: 0 auto; }
+
+  .assess-header { text-align: center; margin-bottom: 1.1rem; }
+  .assess-header h1 { font-size: 1.35rem; font-weight: 800; margin-bottom: 0.25rem; }
+  .assess-header p { font-size: 0.9rem; color: var(--text-muted); margin: 0; }
+
+  .assess-progress { margin-bottom: 1.35rem; }
+  .assess-progress-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 0.45rem;
+  }
+  .assess-progress-label { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); }
+  .assess-progress-pct { font-size: 0.78rem; font-weight: 800; color: var(--forest); }
+  .assess-progress-track {
+    height: 6px; background: var(--border); border-radius: 999px; overflow: hidden;
+  }
+  .assess-progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--sage), var(--forest));
+    border-radius: 999px;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .section-pills {
+    display: flex; gap: 0.35rem; overflow-x: auto; padding-bottom: 0.4rem;
+    margin-bottom: 1rem; scrollbar-width: none;
+  }
+  .section-pills::-webkit-scrollbar { display: none; }
+  .section-pill {
+    flex-shrink: 0; font-size: 0.72rem; font-weight: 700;
+    padding: 0.35rem 0.7rem; border-radius: 999px;
+    background: var(--bg); color: var(--text-muted);
+    border: 1px solid var(--border); white-space: nowrap;
+  }
+  .section-pill.active { background: var(--forest); color: #fff; border-color: var(--forest); }
+  .section-pill.done { background: var(--primary-light); color: var(--forest); border-color: var(--sage); }
+
+  .assess-panel { position: relative; min-height: 340px; }
+  .assess-step { display: none; animation: fadeSlide 0.3s ease; }
+  .assess-step.active { display: block; }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-card {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: 1.35rem 1.15rem 1.25rem;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(232, 237, 233, 0.9);
+  }
+  .section-head { text-align: center; margin-bottom: 1.15rem; }
+  .section-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; margin: 0 auto 0.7rem;
+    background: var(--primary-light);
+  }
+  .section-head h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.3rem; }
+  .section-intro { font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin: 0; }
+
+  .q-block { margin-bottom: 1.35rem; text-align: left; }
+  .q-block:last-child { margin-bottom: 0.3rem; }
+  .q-label {
+    font-size: 0.95rem; font-weight: 700; margin-bottom: 0.55rem;
+    color: var(--text); line-height: 1.4;
+  }
+  .q-hint { font-size: 0.78rem; font-weight: 600; color: var(--text-light); margin-top: 0.15rem; }
+
+  .choice-list { display: flex; flex-direction: column; gap: 0.45rem; }
+  .choice-opt { display: block; cursor: pointer; }
+  .choice-opt input { display: none; }
+  .choice-opt .opt-box {
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 0.75rem 0.95rem;
+    font-size: 0.9rem; font-weight: 600;
+    transition: all 0.18s;
+  }
+  .choice-opt input:checked + .opt-box {
+    border-color: var(--forest);
+    background: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(49, 92, 80, 0.1);
+    color: var(--forest);
+  }
+  .choice-opt:hover .opt-box { border-color: var(--sage); }
+
+  .scale-row {
+    display: flex; justify-content: space-between; gap: 0.35rem;
+  }
+  .scale-row label { flex: 1; cursor: pointer; }
+  .scale-row input { display: none; }
+  .scale-row .num {
+    display: flex; align-items: center; justify-content: center;
+    height: 48px; border-radius: 12px;
+    background: var(--bg); font-weight: 800; font-size: 1.05rem;
+    color: var(--text-muted); border: 2px solid transparent;
+    transition: all 0.18s;
+  }
+  .scale-row input:checked + .num {
+    background: var(--forest); color: #fff; border-color: var(--forest);
+    box-shadow: 0 4px 14px rgba(49, 92, 80, 0.25);
+    transform: scale(1.05);
+  }
+  .scale-ends {
+    display: flex; justify-content: space-between;
+    font-size: 0.7rem; font-weight: 700; color: var(--text-light);
+    margin-top: 0.3rem; padding: 0 0.1rem;
+  }
+
+  .text-input, .text-area {
+    width: 100%; padding: 0.8rem 1rem;
+    border: 2px solid var(--border); border-radius: 12px;
+    font-family: inherit; font-size: 1rem; background: var(--card);
+    color: var(--text); transition: border-color 0.2s;
+  }
+  .text-input:focus, .text-area:focus {
+    outline: none; border-color: var(--forest);
+    box-shadow: 0 0 0 3px rgba(49, 92, 80, 0.1);
+  }
+  .text-area { min-height: 90px; resize: vertical; }
+
+  .assess-nav { display: flex; gap: 0.65rem; margin-top: 1.3rem; }
+  .assess-nav .btn { flex: 1; }
+  .btn-prev {
+    background: transparent; color: var(--text-muted);
+    border: 2px solid var(--border); box-shadow: none;
+  }
+  .btn-prev:hover { background: var(--primary-light); border-color: var(--sage); color: var(--forest); }
+  .btn-prev:disabled { opacity: 0.35; pointer-events: none; }
+
+  .review-card { text-align: left; }
+  .review-title { text-align: center; font-size: 1.15rem; font-weight: 800; margin-bottom: 0.25rem; }
+  .review-sub { text-align: center; font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.1rem; }
+  .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .review-item {
+    background: var(--bg); border-radius: 12px; padding: 0.65rem 0.6rem;
+    display: flex; align-items: center; gap: 0.45rem;
+  }
+  .review-item .ri-icon { font-size: 1.15rem; }
+  .review-item .ri-name { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); }
+  .review-item .ri-val { font-size: 1.05rem; font-weight: 800; color: var(--forest); }
+  .review-item.low .ri-val { color: #E07A5F; }
+  .review-item.high .ri-val { color: #4CAF7A; }
+
+  .thanks-box {
+    background: linear-gradient(145deg, #E8F2EE, #F0F6F2);
+    border-radius: 14px; padding: 1rem; margin-top: 1rem;
+    font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; text-align: center;
+  }
+
+  .assess-safety {
+    margin-top: 1.3rem;
+    background: #FDF0EA; border-radius: 12px; padding: 0.8rem 1rem;
+    font-size: 0.8rem; color: #8B5A4A; line-height: 1.45; text-align: center;
+  }
+  .assess-safety strong { display: block; margin-bottom: 0.1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if is_guest %}
+
+{% endif %}
+
+<div class="assess-wrap">
+  <div class="assess-header">
+    <h1>🗺️ Vẽ Bản đồ của {{ name }}</h1>
+    <p>Trả lời theo cảm nhận & thói quen khoảng 3 tháng gần đây.</p>
+  </div>
+
+  <div class="assess-progress">
+    <div class="assess-progress-top">
+      <span class="assess-progress-label" id="progressLabel">Bước 1</span>
+      <span class="assess-progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="assess-progress-track">
+      <div class="assess-progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <div class="section-pills" id="sectionPills">
+    {% for s in sections %}
+    <div class="section-pill {% if loop.first %}active{% endif %}" data-idx="{{ loop.index0 }}">
+      {{ s.icon }} {{ s.title }}
+    </div>
+    {% endfor %}
+    <div class="section-pill" data-idx="{{ sections|length }}">✨ Xem lại</div>
+  </div>
+
+  <form method="POST" id="assessForm" novalidate>
+    <div class="assess-panel">
+      {% for section in sections %}
+      <div class="assess-step {% if loop.first %}active{% endif %}"
+           data-step="{{ loop.index0 }}"
+           data-section="{{ section.id }}">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-icon">{{ section.icon }}</div>
+            <h2>{{ section.title }}</h2>
+            <p class="section-intro">{{ section.intro }}</p>
+          </div>
+
+          {% for q in section.questions %}
+          <div class="q-block" data-qid="{{ q.id }}">
+            <div class="q-label">
+              {{ q.label }}
+              {% if q.required %}<span style="color:#E07A5F">*</span>{% endif %}
+              {% if q.hint %}<div class="q-hint">{{ q.hint }}</div>{% endif %}
+            </div>
+
+            {% if q.type == 'choice' %}
+            <div class="choice-list">
+              {% for opt in q.options %}
+              <label class="choice-opt">
+                <input type="radio" name="{{ q.id }}" value="{{ opt.value }}"
+                       {% if q.required and loop.first %}required{% endif %}>
+                <div class="opt-box">{{ opt.label }}</div>
+              </label>
+              {% endfor %}
+            </div>
+
+            {% elif q.type == 'scale' %}
+            <div class="scale-row">
+              {% for i in range(q.min, q.max + 1) %}
+              <label>
+                <input type="radio" name="{{ q.id }}" value="{{ i }}"
+                       {% if i == 3 %}checked{% endif %}
+                       {% if q.required %}required{% endif %}>
+                <span class="num">{{ i }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="scale-ends"><span>Thấp</span><span>Cao</span></div>
+
+            {% elif q.type == 'textarea' %}
+            <textarea class="text-area" name="{{ q.id }}"
+                      placeholder="{{ q.placeholder or '' }}"
+                      {% if q.required %}required{% endif %}></textarea>
+
+            {% else %}
+            <input class="text-input"
+                   type="{{ q.input_type or 'text' }}"
+                   name="{{ q.id }}"
+                   placeholder="{{ q.placeholder or '' }}"
+                   {% if q.required %}required{% endif %}>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="assess-step" data-step="{{ sections|length }}" data-section="review">
+        <div class="section-card review-card">
+          <div class="section-head">
+            <div class="section-icon" style="background:linear-gradient(145deg,#E8F2EE,#D4E8DF)">✨</div>
+            <h2 class="review-title">Sắp xong rồi!</h2>
+            <p class="review-sub">Hệ thống sẽ tính điểm 6 trụ cột từ câu trả lời của bạn.</p>
+          </div>
+          <div class="review-grid" id="reviewGrid">
+            {% for key, pname in pillar_names.items() %}
+            <div class="review-item" data-pillar="{{ key }}">
+              <span class="ri-icon">
+                {% if key == 'giac_ngu' %}😴
+                {% elif key == 'dinh_duong' %}🥗
+                {% elif key == 'van_dong' %}🏃
+                {% elif key == 'nhip_sinh_hoc' %}🕰️
+                {% elif key == 'cam_xuc' %}😊
+                {% else %}✨{% endif %}
+              </span>
+              <div>
+                <div class="ri-name">{{ pname }}</div>
+                <div class="ri-val" id="preview-{{ key }}">—</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="thanks-box">
+            Cảm ơn bạn đã dành thời gian. Dữ liệu sẽ được lưu và đồng bộ để xây dựng Bản đồ Cân bằng Thể – Tâm.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="assess-nav">
+      <button type="button" class="btn btn-prev" id="btnPrev" disabled>← Quay lại</button>
+      <button type="button" class="btn btn-primary" id="btnNext">Tiếp tục →</button>
+      <button type="submit" class="btn btn-primary" id="btnSubmit" style="display:none">
+        Xem Bản đồ của tôi →
+      </button>
+    </div>
+  </form>
+
+  <div class="assess-safety">
+    <strong>Nhắc nhẹ</strong>
+    Kết quả là cảm nhận của bạn tại thời điểm này, không phải kết luận y khoa hay chẩn đoán.
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const totalSections = {{ sections|length }};
+  const totalSteps = totalSections + 1;
+  let current = 0;
+
+  const steps = document.querySelectorAll('.assess-step');
+  const pills = document.querySelectorAll('.section-pill');
+  const fill = document.getElementById('progressFill');
+  const label = document.getElementById('progressLabel');
+  const pctEl = document.getElementById('progressPct');
+  const btnPrev = document.getElementById('btnPrev');
+  const btnNext = document.getElementById('btnNext');
+  const btnSubmit = document.getElementById('btnSubmit');
+  const form = document.getElementById('assessForm');
+
+  function num(name, def) {
+    var checked = form.querySelector('[name="' + name + '"]:checked');
+    var el = checked || form.querySelector('[name="' + name + '"]');
+    if (!el) return def;
+    var v = parseFloat(el.value);
+    return isNaN(v) ? def : Math.max(1, Math.min(5, v));
+  }
+
+  /** Weighted average – must mirror backend compute_scores */
+  function wavg(pairs) {
+    var tw = 0, s = 0;
+    for (var i = 0; i < pairs.length; i++) {
+      s += pairs[i][0] * pairs[i][1];
+      tw += pairs[i][1];
+    }
+    var r = s / (tw || 1);
+    return Math.round(Math.max(1, Math.min(5, r)) * 10) / 10;
+  }
+
+  function previewScores() {
+    var scores = {
+      giac_ngu: wavg([
+        [num('sleep_hours', 3), 1.0],
+        [num('sleep_quality', 3), 2.0],
+        [num('sleep_difficulty', 3), 1.5]
+      ]),
+      dinh_duong: wavg([
+        [num('nutri_meals', 3), 1.0],
+        [num('nutri_healthy', 3), 2.0],
+        [num('nutri_control', 3), 1.5]
+      ]),
+      van_dong: wavg([
+        [num('move_freq', 3), 2.0],
+        [num('move_intensity', 3), 1.2]
+      ]),
+      nhip_sinh_hoc: wavg([
+        [num('bio_routine', 3), 2.0],
+        [num('bio_energy', 3), 1.5],
+        [num('bio_fluctuation', 3), 1.3]
+      ]),
+      cam_xuc: wavg([
+        [num('emo_stress', 3), 2.0],
+        [num('emo_pressure', 3), 1.5],
+        [num('emo_understood', 3), 1.0],
+        [num('emo_share', 3), 1.0],
+        [num('emo_regulate', 3), 2.0],
+        [num('emo_express', 3), 1.3],
+        [num('emo_energy', 3), 1.8],
+        [num('emo_selfaware', 3), 1.5]
+      ]),
+      tinh_than: wavg([
+        [num('spirit_body_signal', 3), 1.5],
+        [num('spirit_selftime', 3), 2.0]
+      ])
+    };
+    Object.keys(scores).forEach(function(k) {
+      var el = document.getElementById('preview-' + k);
+      if (el) el.textContent = scores[k];
+      var item = document.querySelector('.review-item[data-pillar="' + k + '"]');
+      if (item) {
+        item.classList.toggle('low', scores[k] <= 2.5);
+        item.classList.toggle('high', scores[k] >= 4);
+      }
+    });
+  }
+
+  function validateCurrentStep() {
+    var step = steps[current];
+    if (!step || step.dataset.section === 'review') return true;
+    var required = step.querySelectorAll('[required]');
+    for (var i = 0; i < required.length; i++) {
+      var el = required[i];
+      if (el.type === 'radio') {
+        if (!step.querySelector('input[name="' + el.name + '"]:checked')) {
+          alert('Vui lòng trả lời đầy đủ câu hỏi có dấu * trước khi tiếp tục.');
+          return false;
+        }
+      } else if (!el.value.trim()) {
+        el.focus();
+        alert('Vui lòng điền thông tin bắt buộc.');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function updateUI() {
+    steps.forEach(function(s, i) { s.classList.toggle('active', i === current); });
+    pills.forEach(function(p, i) {
+      p.classList.toggle('active', i === current);
+      p.classList.toggle('done', i < current);
+    });
+    var pct = Math.round((current / totalSections) * 100);
+    fill.style.width = Math.min(pct, 100) + '%';
+    pctEl.textContent = Math.min(pct, 100) + '%';
+    if (current < totalSections) {
+      var title = pills[current] ? pills[current].textContent.trim() : '';
+      label.textContent = 'Bước ' + (current + 1) + ' / ' + totalSections + (title ? ' · ' + title : '');
+    } else {
+      label.textContent = 'Xem lại & hoàn tất';
+    }
+    btnPrev.disabled = current === 0;
+    btnNext.style.display = current < totalSteps - 1 ? 'inline-flex' : 'none';
+    btnSubmit.style.display = current === totalSteps - 1 ? 'inline-flex' : 'none';
+    if (current === totalSteps - 1) previewScores();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  btnNext.addEventListener('click', function() {
+    if (!validateCurrentStep()) return;
+    if (current < totalSteps - 1) { current++; updateUI(); }
+  });
+  btnPrev.addEventListener('click', function() {
+    if (current > 0) { current--; updateUI(); }
+  });
+  pills.forEach(function(p, i) {
+    p.addEventListener('click', function() {
+      if (i <= current) { current = i; updateUI(); }
+    });
+  });
+  updateUI();
+})();
+</script>
+{% endblock %}

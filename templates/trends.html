@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Xu hướng – InsideOut HEALTH{% endblock %}
+
+{% block content %}
+<h1 class="page-title">📈 Xu hướng của {{ name }}</h1>
+<p class="page-subtitle">
+  Nhìn lại hành trình theo thời gian. Không so sánh với người khác — chỉ với chính mình.
+</p>
+
+<div class="card">
+  <div class="card-title">Bản đồ hiện tại</div>
+  <div class="score-grid">
+    {% for key, pname in pillar_names.items() %}
+    <div class="score-item {% if scores[key] <= 2 %}low{% elif scores[key] >= 4 %}high{% endif %}">
+      <div class="icon">{{ pillar_icons[key] }}</div>
+      <div class="name">{{ pname }}</div>
+      <div class="value">{{ scores[key] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if history %}
+<div class="card">
+  <div class="card-title">Lịch sử Bản đồ</div>
+  <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1rem;">
+    Các lần bạn đã cập nhật Bản đồ Tâm – Thể.
+  </p>
+  <div class="history-list">
+    {% for h in history|reverse %}
+    <div class="history-item">
+      <div class="date">{{ h.date }}</div>
+      <div class="mini-scores">
+        {% for key, val in h.scores.items() %}
+        <span title="{{ pillar_names[key] }}">{{ pillar_icons[key] }} {{ val }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="icon">📊</div>
+  <p>Chưa có lịch sử Bản đồ.<br>Hãy cập nhật Bản đồ để theo dõi xu hướng.</p>
+  <a href="{{ url_for('assessment') }}" class="btn btn-primary btn-sm">Cập nhật Bản đồ</a>
+</div>
+{% endif %}
+
+{% if mood_avg %}
+<div class="card">
+  <div class="card-title">Cảm xúc theo ngày (check-in)</div>
+  <div class="mood-bars">
+    {% for day, avg in mood_avg.items() %}
+    <div class="mood-bar-row">
+      <span class="day">{{ day[5:] }}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width: {{ (avg / 5 * 100)|int }}%"></div>
+      </div>
+      <span class="avg">{{ avg }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card card-soft">
+  <div class="card-title">✅ Check-in đã ghi</div>
+  <p style="font-size:1.4rem;font-weight:800;color:var(--forest);">{{ checkin_count }}</p>
+  <p style="font-size:0.88rem;color:var(--text-muted);">lần check-in</p>
+</div>
+
+<p class="text-center" style="font-size:0.85rem;color:var(--text-light);">
+  Dữ liệu được lưu cục bộ và có thể đồng bộ lên Google Sheet khi cấu hình.
+</p>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập – InsideOut HEALTH{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="text-center mb-1" style="font-size:2.2rem;">😊</div>
+    <h1>Chào mừng trở lại</h1>
+    <p class="subtitle">Tiếp tục hành trình cân bằng của bạn</p>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@email.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">Mật khẩu</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
+    </form>
+
+    <p class="auth-footer">
+      Chưa có tài khoản? <a href="{{ url_for('register') }}">Đăng ký miễn phí</a>
+    </p>
+    <p class="auth-footer" style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-light);">
+      Demo: demo@insideout.health / demo123
+    </p>
+  </div>
+</div>
+{% endblock %}

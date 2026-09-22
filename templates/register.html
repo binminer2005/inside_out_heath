@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Đăng ký – InsideOut HEALTH{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="text-center mb-1" style="font-size:2.2rem;">🌱</div>
+    <h1>Bắt đầu hành trình</h1>
+    <p class="subtitle">Tạo tài khoản để xây dựng Bản đồ Tâm – Thể của bạn</p>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="name">Tên bạn muốn được gọi</label>
+        <input type="text" id="name" name="name" placeholder="Ví dụ: Anh Tuấn" required autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@email.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">Mật khẩu</label>
+        <input type="password" id="password" name="password" placeholder="Ít nhất 6 ký tự" required minlength="6" autocomplete="new-password">
+      </div>
+      <p class="form-hint" style="margin-bottom:1.15rem;">
+        Bằng việc đăng ký, bạn đồng ý với điều khoản sử dụng và chính sách bảo vệ dữ liệu.
+        Đây <strong>không phải</strong> công cụ y tế.
+      </p>
+      <button type="submit" class="btn btn-primary btn-block">Tạo tài khoản & Vẽ bản đồ</button>
+    </form>
+
+    <p class="auth-footer">
+      Đã có tài khoản? <a href="{{ url_for('login') }}">Đăng nhập</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

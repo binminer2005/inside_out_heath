@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Trang chủ – InsideOut HEALTH{% endblock %}
+
+{% block content %}
+<div class="greeting">
+  <h1>Xin chào, {{ name }} 👋</h1>
+  <p>Hôm nay bạn muốn chăm sóc bản thân như thế nào?</p>
+</div>
+
+{% if habit %}
+<div class="habit-active">
+  <div class="label">Thói quen đang theo dõi</div>
+  <div class="title">{{ habit.title }}</div>
+  <div class="meta">
+    {{ pillar_icons.get(habit.pillar, '') }} {{ pillar_names.get(habit.pillar, '') }}
+    · Gắn mốc: {{ habit.anchor }}
+    · Từ {{ habit.started }}
+  </div>
+</div>
+{% endif %}
+
+{% if has_map %}
+<div class="card">
+  <div class="card-title">🗺️ Bản đồ Tâm – Thể hiện tại</div>
+  <div class="radar-container">
+    <canvas id="radarChart" width="300" height="300"></canvas>
+  </div>
+  <div class="score-grid">
+    {% for key, pname in pillar_names.items() %}
+    <div class="score-item {% if scores[key] <= 2 %}low{% elif scores[key] >= 4 %}high{% endif %}">
+      <div class="icon">{{ pillar_icons[key] }}</div>
+      <div class="name">{{ pname }}</div>
+      <div class="value">{{ scores[key] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="text-center mt-1">
+    <a href="{{ url_for('map_result') }}" class="btn btn-outline btn-sm">Xem chi tiết & chọn thói quen</a>
+  </div>
+</div>
+{% else %}
+<div class="card empty-state">
+  <div class="icon">🗺️</div>
+  <p>Bạn chưa có Bản đồ Tâm – Thể.<br>Hãy dành 3–5 phút để tự đánh giá lần đầu.</p>
+  <a href="{{ url_for('assessment') }}" class="btn btn-primary">Vẽ bản đồ ngay</a>
+</div>
+{% endif %}
+
+<div class="quick-actions">
+  <a href="{{ url_for('checkin') }}" class="quick-action">
+    <div class="icon">✅</div>
+    <div class="label">Check-in hôm nay</div>
+  </a>
+  <a href="{{ url_for('assessment') }}" class="quick-action">
+    <div class="icon">📝</div>
+    <div class="label">Cập nhật bản đồ</div>
+  </a>
+  <a href="{{ url_for('map_result') }}" class="quick-action">
+    <div class="icon">🌱</div>
+    <div class="label">Chọn thói quen</div>
+  </a>
+  <a href="{{ url_for('trends') }}" class="quick-action">
+    <div class="icon">📈</div>
+    <div class="label">Xu hướng</div>
+  </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if has_map %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần'],
+      datasets: [{
+        label: 'Cảm nhận (1-5)',
+        data: [
+          {{ scores.giac_ngu }},
+          {{ scores.dinh_duong }},
+          {{ scores.van_dong }},
+          {{ scores.nhip_sinh_hoc }},
+          {{ scores.cam_xuc }},
+          {{ scores.tinh_than }}
+        ],
+        backgroundColor: 'rgba(49, 92, 80, 0.18)',
+        borderColor: 'rgba(49, 92, 80, 0.9)',
+        borderWidth: 2.5,
+        pointBackgroundColor: [
+          '#FFD166', '#A8BDA8', '#F2B49B', '#A7D8F0', '#C9B6E4', '#315C50'
+        ],
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        r: {
+          min: 0,
+          max: 5,
+          ticks: {
+            stepSize: 1,
+            backdropColor: 'transparent',
+            font: { size: 10, family: 'Nunito' },
+            color: '#8A9B97'
+          },
+          grid: { color: 'rgba(49, 92, 80, 0.08)' },
+          angleLines: { color: 'rgba(49, 92, 80, 0.08)' },
+          pointLabels: {
+            font: { size: 11, weight: '600', family: 'Nunito' },
+            color: '#2C3E3A'
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

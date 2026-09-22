@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#315C50">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>{% block title %}InsideOut HEALTH{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="navbar">
+    <a href="{{ url_for('index') }}" class="navbar-brand">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="InsideOut HEALTH" class="nav-logo">
+    </a>
+    <div class="nav-links">
+      {% if session.get('user') %}
+        <a href="{{ url_for('home') }}">Trang chủ</a>
+        <a href="{{ url_for('checkin') }}">Check-in</a>
+        <a href="{{ url_for('map_result') }}">Bản đồ</a>
+        <a href="{{ url_for('trends') }}">Xu hướng</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">Đăng xuất</a>
+      {% else %}
+        <a href="{{ url_for('assessment') }}">Vẽ bản đồ</a>
+        <a href="{{ url_for('login') }}">Đăng nhập</a>
+        <a href="{{ url_for('assessment') }}" class="btn btn-primary btn-sm">Bắt đầu</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <main class="{% block main_class %}container{% endblock %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if session.get('user') %}
+  <nav class="bottom-nav">
+    <a href="{{ url_for('home') }}" class="{% if request.endpoint == 'home' %}active{% endif %}">
+      <span class="icon">🏠</span><span>Trang chủ</span>
+    </a>
+    <a href="{{ url_for('checkin') }}" class="{% if request.endpoint == 'checkin' %}active{% endif %}">
+      <span class="icon">✅</span><span>Check-in</span>
+    </a>
+    <a href="{{ url_for('map_result') }}" class="{% if request.endpoint == 'map_result' %}active{% endif %}">
+      <span class="icon">🗺️</span><span>Bản đồ</span>
+    </a>
+    <a href="{{ url_for('trends') }}" class="{% if request.endpoint == 'trends' %}active{% endif %}">
+      <span class="icon">📈</span><span>Xu hướng</span>
+    </a>
+  </nav>
+  {% endif %}
+
+  <footer class="footer">
+    <p><strong>InsideOut HEALTH</strong> · Bản đồ Cân bằng Thể – Tâm</p>
+    <p style="margin-top:0.3rem;font-size:0.78rem;">Ấm áp · Không phán xét · Nhỏ mà bền · Cá nhân hóa</p>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

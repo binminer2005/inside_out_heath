@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Bản đồ Tâm – Thể của {{ name }}{% endblock %}
+
+{% block content %}
+<style>
+  .result-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .result-tab {
+    flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--border);
+    border-radius: 12px; background: var(--card); color: var(--text-muted);
+    font: inherit; font-weight: 800; cursor: pointer;
+  }
+  .result-tab.active { background: var(--forest); border-color: var(--forest); color: #fff; }
+  .result-panel { display: none; }
+  .result-panel.active { display: block; animation: fadeSlide 0.25s ease; }
+  .chart-actions { display: flex; gap: 0.65rem; margin-top: 1rem; }
+  .chart-actions .btn { flex: 1; }
+  @media (max-width: 420px) {
+    .chart-actions { flex-direction: column; }
+  }
+</style>
+{% if is_guest %}
+<div class="card" style="margin-bottom:1rem;background:var(--primary-light);">
+  <div class="card-title">Bản đồ của bạn đã sẵn sàng</div>
+  <p style="margin-bottom:0.8rem;color:var(--text-muted);">
+    Bạn muốn đăng nhập hoặc đăng ký để tiếp tục hành trình và theo dõi kết quả lâu dài không?
+  </p>
+  <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+    <a href="{{ url_for('register') }}" class="btn btn-primary">Đăng ký để tiếp tục</a>
+    <a href="{{ url_for('login') }}" class="btn btn-ghost">Đăng nhập</a>
+    <a href="#summaryPanel" class="btn btn-ghost">Xem kết quả trước</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="steps">
+  <div class="step-dot"></div>
+  <div class="step-dot active"></div>
+  <div class="step-dot"></div>
+</div>
+
+<h1 class="page-title">🗺️ Bản đồ của {{ name }}</h1>
+<p class="page-subtitle">
+  Đây là cảm nhận của bạn tại thời điểm này. Không phải kết luận y khoa.
+  Hãy chọn <strong>1 trụ cột</strong> để bắt đầu với một thói quen siêu nhỏ.
+</p>
+
+<div class="result-tabs" role="tablist" aria-label="Kết quả bản đồ">
+  <button class="result-tab active" type="button" role="tab" aria-selected="true" data-tab="summaryPanel">
+    1. Tổng quan
+  </button>
+  <button class="result-tab" type="button" role="tab" aria-selected="false" data-tab="chartPanel">
+    2. Biểu đồ
+  </button>
+</div>
+
+<div id="summaryPanel" class="result-panel active" role="tabpanel">
+  <div class="card">
+    <div class="score-grid">
+      {% for key, pname in pillar_names.items() %}
+      <div class="score-item {% if scores[key] <= 2 %}low{% elif scores[key] >= 4 %}high{% endif %}">
+        <div class="icon">{{ pillar_icons[key] }}</div>
+        <div class="name">{{ pname }}</div>
+        <div class="value">{{ scores[key] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div id="chartPanel" class="result-panel" role="tabpanel" aria-hidden="true">
+  <div class="card">
+    <div class="radar-container">
+      <canvas id="radarChart" width="420" height="420"></canvas>
+    </div>
+    <div class="chart-actions">
+      <button type="button" class="btn btn-primary" id="downloadChart">Tải ảnh biểu đồ</button>
+      <button type="button" class="btn btn-ghost" data-show-tab="summaryPanel">Xem tổng quan</button>
+    </div>
+  </div>
+</div>
+
+<div class="suggest-banner">
+  <div class="label">Gợi ý bắt đầu</div>
+  <div class="title">{{ pillar_icons[lowest] }} {{ pillar_names[lowest] }}</div>
+  <p>Trụ cột này đang cần sự quan tâm hơn. Chỉ cần chọn 1 thói quen siêu nhỏ — nhỏ mà bền.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">🌱 Chọn 1 thói quen siêu nhỏ</div>
+  <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1rem;">
+    Gắn vào một mốc có sẵn trong ngày của bạn. Chỉ theo dõi 1 thói quen tại một thời điểm.
+  </p>
+
+  <form method="POST" action="{{ url_for('choose_habit') }}">
+    <input type="hidden" name="pillar" value="{{ lowest }}">
+    <div class="habit-list">
+      {% for h in habits %}
+      <label class="habit-option">
+        <input type="radio" name="habit_id" value="{{ h.id }}" required {% if loop.first %}checked{% endif %}>
+        <div>
+          <div class="title">{{ h.title }}</div>
+          <div class="anchor">Gắn mốc: {{ h.anchor }}</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block mt-2">
+      Bắt đầu thói quen này →
+    </button>
+  </form>
+</div>
+
+<p class="text-center" style="font-size:0.85rem;color:var(--text-light);">
+  Bạn có thể đổi trụ cột và thói quen bất cứ lúc nào sau này.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const personName = {{ name|tojson }};
+  const chart = new Chart(document.getElementById('radarChart').getContext('2d'), {
+    type: 'radar',
+    data: {
+      labels: ['Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần'],
+      datasets: [{
+        label: 'Cảm nhận (1-5)',
+        data: [
+          {{ scores.giac_ngu }},
+          {{ scores.dinh_duong }},
+          {{ scores.van_dong }},
+          {{ scores.nhip_sinh_hoc }},
+          {{ scores.cam_xuc }},
+          {{ scores.tinh_than }}
+        ],
+        backgroundColor: 'rgba(49, 92, 80, 0.18)',
+        borderColor: 'rgba(49, 92, 80, 0.9)',
+        borderWidth: 2.5,
+        pointBackgroundColor: [
+          '#FFD166', '#A8BDA8', '#F2B49B', '#A7D8F0', '#C9B6E4', '#315C50'
+        ],
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        r: {
+          min: 0,
+          max: 5,
+          ticks: {
+            stepSize: 1,
+            backdropColor: 'transparent',
+            font: { size: 10, family: 'Nunito' },
+            color: '#8A9B97'
+          },
+          grid: { color: 'rgba(49, 92, 80, 0.08)' },
+          angleLines: { color: 'rgba(49, 92, 80, 0.08)' },
+          pointLabels: {
+            font: { size: 11, weight: '600', family: 'Nunito' },
+            color: '#2C3E3A'
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+
+  function showTab(panelId) {
+    document.querySelectorAll('.result-tab').forEach((tab) => {
+      const isActive = tab.dataset.tab === panelId;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', String(isActive));
+    });
+    document.querySelectorAll('.result-panel').forEach((panel) => {
+      const isActive = panel.id === panelId;
+      panel.classList.toggle('active', isActive);
+      panel.setAttribute('aria-hidden', String(!isActive));
+    });
+    if (panelId === 'chartPanel') chart.resize();
+  }
+
+  document.querySelectorAll('.result-tab, [data-show-tab]').forEach((control) => {
+    control.addEventListener('click', () => showTab(control.dataset.tab || control.dataset.showTab));
+  });
+
+  document.getElementById('downloadChart').addEventListener('click', () => {
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = 1000;
+    exportCanvas.height = 1160;
+    const exportContext = exportCanvas.getContext('2d');
+    exportContext.fillStyle = '#ffffff';
+    exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportContext.fillStyle = '#254539';
+    exportContext.textAlign = 'center';
+    exportContext.font = '800 34px Nunito, Arial, sans-serif';
+    exportContext.fillText('Bản đồ Cân bằng Thể - Tâm', 500, 58);
+    exportContext.font = '600 28px Nunito, Arial, sans-serif';
+    exportContext.fillStyle = '#5C7268';
+    exportContext.fillText('Họ và tên: ' + personName, 500, 105);
+    exportContext.drawImage(document.getElementById('radarChart'), 80, 160, 840, 840);
+    const link = document.createElement('a');
+    link.download = 'insideout-ban-do-' + personName.trim().replace(/\s+/g, '-') + '.png';
+    link.href = exportCanvas.toDataURL('image/png');
+    link.click();
+  });
+</script>
+{% endblock %}

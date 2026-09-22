@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}InsideOut HEALTH – Bản đồ Cân bằng Thể – Tâm{% endblock %}
+{% block main_class %}lp-main{% endblock %}
+
+{% block head %}
+<style>
+  body.landing-page { background: #F7F4EF; padding-bottom: 2.5rem; }
+  body.landing-page .footer { margin-top: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ========== HERO ========== -->
+<section class="lp-hero">
+  <div class="lp-hero-frame">
+    <img
+      src="{{ url_for('static', filename='images/cover.png') }}"
+      alt="InsideOut HEALTH – A little universe inside you"
+      class="lp-hero-img"
+    >
+    <div class="lp-hero-veil">
+      <div class="lp-hero-copy">
+        <h1 class="lp-h1">
+          Bản đồ Cân bằng<br>
+          <span class="lp-h1-accent">Thể – Tâm</span>
+        </h1>
+        <p class="lp-sub">Hiểu mình – Chăm sóc mình – Sống cân bằng hơn mỗi ngày</p>
+        <div class="lp-actions">
+          <a href="{{ url_for('register') }}" class="btn btn-primary lp-btn">Bắt đầu hành trình →</a>
+          <a href="{{ url_for('login') }}" class="lp-link">Đã có tài khoản</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ========== INSIDEOUT UNIVERSE – Characters ========== -->
+<section class="lp-chars-section">
+  <div class="lp-chars-inner">
+    <p class="lp-chars-label"><span class="dot"></span> InsideOut Universe <span class="dot"></span></p>
+    <div class="lp-chars-row" role="list">
+      <div class="lp-char c-joy" role="listitem">
+        <div class="lp-char-bubble">
+          <span class="lp-char-face">😄</span>
+        </div>
+        <span class="lp-char-name">Joy</span>
+        <span class="lp-char-vi">Năng lượng tích cực</span>
+      </div>
+      <div class="lp-char c-calm" role="listitem">
+        <div class="lp-char-bubble">
+          <span class="lp-char-face">😌</span>
+        </div>
+        <span class="lp-char-name">Calm</span>
+        <span class="lp-char-vi">Nghỉ ngơi phục hồi</span>
+      </div>
+      <div class="lp-char c-balance" role="listitem">
+        <div class="lp-char-bubble">
+          <span class="lp-char-face">🌿</span>
+        </div>
+        <span class="lp-char-name">Balance</span>
+        <span class="lp-char-vi">Cân bằng thói quen</span>
+      </div>
+      <div class="lp-char c-reflect" role="listitem">
+        <div class="lp-char-bubble">
+          <span class="lp-char-face">💜</span>
+        </div>
+        <span class="lp-char-name">Reflect</span>
+        <span class="lp-char-vi">Tự nhận thức</span>
+      </div>
+      <div class="lp-char c-care" role="listitem">
+        <div class="lp-char-bubble">
+          <span class="lp-char-face">💗</span>
+        </div>
+        <span class="lp-char-name">Care</span>
+        <span class="lp-char-vi">Kết nối yêu thương</span>
+      </div>
+      <div class="lp-char c-grow" role="listitem">
+        <div class="lp-char-bubble">
+          <span class="lp-char-face">✨</span>
+        </div>
+        <span class="lp-char-name">Grow</span>
+        <span class="lp-char-vi">Khám phá phát triển</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="lp-content">
+  <!-- ========== CÁCH ĐỒNG HÀNH ========== -->
+  <!-- ========== CÁCH ĐỒNG HÀNH (Brand Identity) ========== -->
+  <section class="lp-block lp-universe">
+    <div class="lp-flow">
+      <div class="lp-orbit orbit-a" aria-hidden="true"></div>
+      <div class="lp-orbit orbit-b" aria-hidden="true"></div>
+      <span class="lp-float-char char-joy" aria-hidden="true">😄</span>
+      <span class="lp-float-char char-calm" aria-hidden="true">😌</span>
+      <span class="lp-float-char char-care" aria-hidden="true">💗</span>
+
+      <h2 class="lp-h2"><span class="lp-sprout" aria-hidden="true">🌱</span> Cách chúng tôi đồng hành</h2>
+      <p class="lp-lead">
+        Chỉ một thói quen siêu nhỏ mỗi lần. Gắn vào thói quen có sẵn trong ngày.
+        Không áp lực, không phạt khi bỏ lỡ.
+      </p>
+
+      <ol class="lp-steps">
+        <li class="lp-step">
+          <span class="lp-num-wrap">
+            <span class="lp-ring"></span>
+            <span class="lp-num">1</span>
+          </span>
+          <span class="lp-step-label">Vẽ bản đồ</span>
+        </li>
+        <li class="lp-connector" aria-hidden="true"><span></span></li>
+        <li class="lp-step">
+          <span class="lp-num-wrap">
+            <span class="lp-ring"></span>
+            <span class="lp-num">2</span>
+          </span>
+          <span class="lp-step-label">Chọn 1 trụ cột</span>
+        </li>
+        <li class="lp-connector" aria-hidden="true"><span></span></li>
+        <li class="lp-step">
+          <span class="lp-num-wrap">
+            <span class="lp-ring"></span>
+            <span class="lp-num">3</span>
+          </span>
+          <span class="lp-step-label">1 thói quen nhỏ</span>
+        </li>
+        <li class="lp-connector" aria-hidden="true"><span></span></li>
+        <li class="lp-step">
+          <span class="lp-num-wrap">
+            <span class="lp-ring"></span>
+            <span class="lp-num">4</span>
+          </span>
+          <span class="lp-step-label">Check-in nhẹ</span>
+        </li>
+        <li class="lp-connector" aria-hidden="true"><span></span></li>
+        <li class="lp-step">
+          <span class="lp-num-wrap">
+            <span class="lp-ring"></span>
+            <span class="lp-num">5</span>
+          </span>
+          <span class="lp-step-label">Nhìn thấy thay đổi</span>
+          <span class="lp-growth" aria-hidden="true">🌿</span>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ========== GIÁ TRỊ CỐT LÕI ========== -->
+  <section class="lp-block">
+    <div class="lp-values">
+      <article class="lp-value v-feel">
+        <span class="lp-value-icon" aria-hidden="true">
+          <span class="icon-circle ic-heart">💛</span>
+        </span>
+        <h3 class="lp-value-title">Ấm áp, không phán xét</h3>
+      </article>
+      <article class="lp-value v-grow">
+        <span class="lp-value-icon" aria-hidden="true">
+          <span class="icon-circle ic-sprout">🌱</span>
+        </span>
+        <h3 class="lp-value-title">Nhỏ mà bền</h3>
+      </article>
+      <article class="lp-value v-person">
+        <span class="lp-value-icon" aria-hidden="true">
+          <span class="icon-circle ic-person">👤</span>
+        </span>
+        <h3 class="lp-value-title">Cá nhân hóa</h3>
+      </article>
+      <article class="lp-value v-lock">
+        <span class="lp-value-icon" aria-hidden="true">
+          <span class="icon-circle ic-lock">🔒</span>
+        </span>
+        <h3 class="lp-value-title">Minh bạch & riêng tư</h3>
+      </article>
+    </div>
+  </section>
+
+  <!-- ========== DISCLAIMER ========== -->
+  <section class="lp-block">
+    <div class="lp-note">
+      <strong>Lưu ý quan trọng</strong>
+      Đây không phải công cụ y tế hay chẩn đoán. Nếu bạn đang gặp khó khăn nghiêm trọng,
+      hãy tìm đến chuyên gia hoặc đường dây hỗ trợ uy tín.
+    </div>
+  </section>
+
+  <p class="lp-demo">Demo: <code>demo@insideout.health</code> / <code>demo123</code></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>document.body.classList.add('landing-page');</script>
+{% endblock %}

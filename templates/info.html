@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Giới thiệu – InsideOut HEALTH{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Về InsideOut HEALTH</h1>
+<p class="page-subtitle">Bản đồ Cân bằng Thể – Tâm</p>
+
+<div class="card">
+  <div class="card-title">✨ Giá trị cốt lõi</div>
+  <p style="color:var(--text-muted);font-size:0.95rem;margin-bottom:1rem;">
+    Chúng tôi khám phá mối liên hệ sâu sắc giữa sức khỏe thể chất và tinh thần để giúp bạn xác định nguyên nhân gốc rễ của sự mất cân bằng trong đời sống thường ngày.
+  </p>
+  <p style="font-weight:700;color:var(--forest);font-size:0.98rem;">
+    Hiểu mình. Chăm mình. Lớn lên từng chút.
+  </p>
+</div>
+
+<div class="card">
+  <div class="card-title">🌿 Sáu trụ cột</div>
+  <div class="score-grid">
+    <div class="score-item">
+      <div class="icon">😴</div>
+      <div class="name">Giấc ngủ</div>
+    </div>
+    <div class="score-item">
+      <div class="icon">🥗</div>
+      <div class="name">Dinh dưỡng</div>
+    </div>
+    <div class="score-item">
+      <div class="icon">🏃</div>
+      <div class="name">Vận động</div>
+    </div>
+    <div class="score-item">
+      <div class="icon">🕰️</div>
+      <div class="name">Nhịp sinh học</div>
+    </div>
+    <div class="score-item">
+      <div class="icon">😊</div>
+      <div class="name">Cảm xúc</div>
+    </div>
+    <div class="score-item">
+      <div class="icon">✨</div>
+      <div class="name">Tinh thần</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">🌱 Nguyên tắc thiết kế</div>
+  <ul style="padding-left:1.25rem;color:var(--text-muted);font-size:0.95rem;line-height:1.7;">
+    <li>Mỗi lần chỉ 1 thói quen chính</li>
+    <li>Thói quen siêu nhỏ (Tiny Habits), gắn mốc có sẵn</li>
+    <li>Tương quan, không kết luận nhân quả</li>
+    <li>Không streak khắt khe — bỏ lỡ không bị phạt</li>
+    <li>Ngôn ngữ ấm áp, không phán xét</li>
+    <li>Kết quả là “cảm nhận của bạn”, không phải số đo khoa học</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-title">🔒 An toàn & Riêng tư</div>
+  <p style="color:var(--text-muted);font-size:0.95rem;">
+    Đây <strong>không phải</strong> công cụ y tế hay chẩn đoán.
+    Nếu bạn đang gặp khó khăn nghiêm trọng về tâm lý, hãy tìm đến chuyên gia
+    hoặc đường dây hỗ trợ uy tín.
+    Dữ liệu cá nhân được mã hóa và tuân thủ quy định bảo vệ dữ liệu.
+  </p>
+</div>
+
+{% if not session.get('user') %}
+<div class="text-center mt-2">
+  <a href="{{ url_for('register') }}" class="btn btn-primary">Bắt đầu miễn phí</a>
+</div>
+{% endif %}
+{% endblock %}

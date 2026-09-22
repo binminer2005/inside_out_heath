@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Về dự án – InsideOut HEALTH{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Về dự án</h1>
+<p class="page-subtitle">Demo phiên bản v0.2 – MVP UI upgrade</p>
+
+<div class="card">
+  <p style="margin-bottom:1rem;">
+    Đây là bản demo kỹ thuật của dự án <strong>INSIDEOUT HEALTH – Bản đồ Cân bằng Thể – Tâm</strong>.
+    Mục tiêu là minh họa vòng lặp sản phẩm cốt lõi:
+  </p>
+  <p style="font-weight:700;color:var(--forest);margin-bottom:1rem;">
+    Vẽ bản đồ → Chọn 1 trụ cột → Nhận 1 thói quen siêu nhỏ → Check-in hằng ngày → Xem tác động → Điều chỉnh
+  </p>
+  <p style="color:var(--text-muted);font-size:0.95rem;">
+    Dữ liệu trong demo được lưu tạm trong bộ nhớ server (reset khi restart).
+    Không kết nối database thật, không gửi thông báo, không tích hợp thanh toán.
+  </p>
+</div>
+
+<div class="card card-soft">
+  <div class="card-title">🎨 Brand system</div>
+  <p style="font-size:0.92rem;color:var(--text-muted);">
+    Giao diện được nâng cấp theo brand guide: palette Forest / Sage / Peach / Sun / Sky / Lavender, font Nunito, phong cách ấm áp – soft – human.
+  </p>
+</div>
+{% endblock %}
