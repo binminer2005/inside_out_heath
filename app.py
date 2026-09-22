@@ -324,7 +324,7 @@ ASSESSMENT_SECTIONS = [
                 'type': 'text',
                 'input_type': 'text',
                 'label': 'Tên người giới thiệu (nếu có)',
-                'placeholder': 'Để trống nếu không có',
+                'placeholder': 'Nhập tên hoặc ghi Không có',
                 'required': True
             },
         ]
