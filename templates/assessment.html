@@ -120,7 +120,9 @@
     border: 2px solid var(--border); border-radius: 12px;
     font-family: inherit; font-size: 1rem; background: var(--card);
     color: var(--text); transition: border-color 0.2s;
+    min-width: 0;
   }
+  input[type="date"].text-input { max-width: 100%; }
   .text-input:focus, .text-area:focus {
     outline: none; border-color: var(--forest);
     box-shadow: 0 0 0 3px rgba(49, 92, 80, 0.1);
@@ -170,6 +172,13 @@
     .assess-nav .btn { min-width: 0; padding: 0.7rem 0.55rem; font-size: 0.86rem; }
     .choice-opt .opt-box { padding: 0.7rem 0.75rem; font-size: 0.86rem; }
     .q-label { font-size: 0.9rem; }
+    input[type="date"].text-input {
+      width: 100%;
+      min-width: 0;
+      padding-left: 0.7rem;
+      padding-right: 0.35rem;
+      font-size: 0.95rem;
+    }
   }
 </style>
 {% endblock %}

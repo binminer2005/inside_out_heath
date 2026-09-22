@@ -65,5 +65,13 @@
     <p style="margin-top:0.3rem;font-size:0.78rem;">Ấm áp · Không phán xét · Nhỏ mà bền · Cá nhân hóa</p>
   </footer>
   {% block scripts %}{% endblock %}
+  <script>
+    document.querySelectorAll('.flash').forEach(function (message) {
+      window.setTimeout(function () {
+        message.classList.add('flash-hide');
+        window.setTimeout(function () { message.remove(); }, 300);
+      }, 4000);
+    });
+  </script>
 </body>
 </html>

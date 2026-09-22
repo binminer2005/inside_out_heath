@@ -757,8 +757,9 @@
         <p>Your Inner Map — bạn đang ở đâu hôm nay?</p>
       </div>
       <div style="display:flex;justify-content:center;padding:8px 0 12px;">
-           <img src="{{ url_for('static', filename='images/innermap.png') }}" alt="Personal Balance Map – 6 trụ cột"
-             class="map-preview-image">
+           <img src="{{ url_for('static', filename='images/innermap.png') }}?v=2" alt="Personal Balance Map – 6 trụ cột"
+             class="map-preview-image"
+             onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/innermap.png') }}';">
       </div>
     </section>
 

@@ -795,8 +795,7 @@ def index():
         return redirect(url_for('home'))
     path = os.path.join(app.root_path, 'templates', 'landing_full.html')
     if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return f.read()
+        return render_template('landing_full.html')
     return render_template('landing.html')
 
 

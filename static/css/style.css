@@ -185,7 +185,10 @@ h1, h2, h3 { font-weight: 700; line-height: 1.25; color: var(--text); }
   margin-bottom: 1rem;
   font-size: 0.92rem;
   font-weight: 600;
+  opacity: 1;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
+.flash-hide { opacity: 0; transform: translateY(-6px); }
 .flash-success { background: #E8F5EE; color: #2E7D4F; }
 .flash-error { background: #FDECEA; color: #C0392B; }
 .flash-info { background: #EAF6FC; color: #2A6A8A; }
