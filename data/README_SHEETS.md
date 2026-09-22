@@ -33,7 +33,11 @@ Cột gồm:
 - emo_stress, emo_pressure, emo_understood, emo_share, emo_regulate, emo_express, emo_energy, emo_selfaware
 - spirit_body_signal, spirit_selftime
 - goals, want_coaching
-- score_giac_ngu … score_tinh_than, score_avg
+- score_giac_ngu … score_tinh_than, score_avg, chart_image, chart_scores
+
+`chart_image` là công thức `IMAGE(...)`, hiển thị radar chart trực tiếp trong Google
+Sheet. `chart_scores` lưu lại thông số 6 trụ để dễ lọc và đối chiếu. Ảnh được tạo
+qua QuickChart từ các điểm số của từng lần assessment.
 
 ### Sheet `Checkins` (mỗi lần check-in hàng ngày)
 timestamp | email | name | mood | habit_done | habit_title | note | 6 scores

@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 import json
 from copy import deepcopy
+from urllib.parse import quote
 
 app = Flask(__name__)
 app.secret_key = os.environ.get(
@@ -85,6 +86,34 @@ def _get_gspread_client():
     creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
     return gspread.authorize(creds)
 
+
+def build_chart_image_url(scores):
+    """Build a shareable radar-chart image URL for Google Sheets."""
+    labels = ['Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần']
+    values = [round(float(scores.get(key, 0)), 2) for key in (
+        'giac_ngu', 'dinh_duong', 'van_dong', 'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
+    )]
+    config = {
+        'type': 'radar',
+        'data': {
+            'labels': labels,
+            'datasets': [{
+                'label': 'Cảm nhận (1-5)',
+                'data': values,
+                'backgroundColor': 'rgba(49,92,80,0.18)',
+                'borderColor': '#315C50',
+                'borderWidth': 3,
+                'pointBackgroundColor': ['#FFD166', '#A8BDA8', '#F2B49B', '#A7D8F0', '#C9B6E4', '#315C50']
+            }]
+        },
+        'options': {
+            'scale': {'min': 0, 'max': 5, 'ticks': {'stepSize': 1}},
+            'plugins': {'legend': {'display': False}}
+        }
+    }
+    encoded_config = quote(json.dumps(config, ensure_ascii=False, separators=(',', ':')))
+    return f'https://quickchart.io/chart?width=720&height=720&format=png&c={encoded_config}'
+
 def sync_assessment_to_sheets(user_email, user_data, raw, scores):
     """Append full assessment row to Google Sheet."""
     if not SPREADSHEET_ID:
@@ -117,9 +146,26 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
                 # Computed scores
                 'score_giac_ngu', 'score_dinh_duong', 'score_van_dong',
                 'score_nhip_sinh_hoc', 'score_cam_xuc', 'score_tinh_than',
-                'score_avg'
+                'score_avg', 'chart_image', 'chart_scores'
             ]
             ws.append_row(headers)
+        headers = ws.row_values(1)
+        for header in ('chart_image', 'chart_scores'):
+            if header not in headers:
+                ws.update_cell(1, len(headers) + 1, header)
+                headers.append(header)
+
+        score_values = [scores.get(key, '') for key in (
+            'giac_ngu', 'dinh_duong', 'van_dong', 'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
+        )]
+        chart_url = build_chart_image_url(scores)
+        chart_formula = f'=IMAGE("{chart_url}")'
+        chart_scores = ' | '.join(
+            f'{label}: {value}' for label, value in zip(
+                ('Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần'),
+                score_values
+            )
+        )
 
         row = [
             datetime.now().isoformat(timespec='seconds'),
@@ -167,9 +213,11 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
             scores.get('nhip_sinh_hoc', ''),
             scores.get('cam_xuc', ''),
             scores.get('tinh_than', ''),
-            round(sum(scores.values()) / max(len(scores), 1), 2) if scores else ''
+            round(sum(scores.values()) / max(len(scores), 1), 2) if scores else '',
+            chart_formula,
+            chart_scores
         ]
-        ws.append_row(row)
+        ws.append_row(row, value_input_option='USER_ENTERED')
         return True, 'Đã đồng bộ Assessment lên Google Sheet'
     except ImportError:
         return False, 'Cần cài: pip install gspread google-auth'

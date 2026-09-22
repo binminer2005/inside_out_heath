@@ -205,6 +205,20 @@
     exportContext.fillStyle = '#5C7268';
     exportContext.fillText('Họ và tên: ' + personName, 500, 105);
     exportContext.drawImage(document.getElementById('radarChart'), 80, 160, 840, 840);
+    exportContext.textAlign = 'left';
+    exportContext.font = '600 22px Nunito, Arial, sans-serif';
+    exportContext.fillStyle = '#315C50';
+    const chartScores = [
+      ['Giấc ngủ', {{ scores.giac_ngu }}], ['Dinh dưỡng', {{ scores.dinh_duong }}],
+      ['Vận động', {{ scores.van_dong }}], ['Nhịp sinh học', {{ scores.nhip_sinh_hoc }}],
+      ['Cảm xúc', {{ scores.cam_xuc }}], ['Tinh thần', {{ scores.tinh_than }}]
+    ];
+    exportContext.fillText('Thông số (thang điểm 1-5)', 80, 1045);
+    chartScores.forEach((item, index) => {
+      const x = index < 3 ? 80 : 520;
+      const y = 1080 + (index % 3) * 26;
+      exportContext.fillText(item[0] + ': ' + item[1], x, y);
+    });
     const link = document.createElement('a');
     link.download = 'insideout-ban-do-' + personName.trim().replace(/\s+/g, '-') + '.png';
     link.href = exportCanvas.toDataURL('image/png');
