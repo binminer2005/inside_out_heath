@@ -25,7 +25,7 @@ Link: https://docs.google.com/spreadsheets/d/1fcR2HFA1E5jalJaZ2gsoIJVgT_INMBQgCR
 
 ### Sheet `Assessments` (khi user hoàn thành form chi tiết)
 Cột gồm:
-- timestamp, email, ho_ten, dob, gioi_tinh, sdt, nghe_nghiep, nguoi_gioi_thieu
+- timestamp, email, ho_ten, dob, gioi_tinh, ton_giao, sdt, nghe_nghiep, nguoi_gioi_thieu
 - sleep_hours, sleep_quality, sleep_difficulty
 - nutri_meals, nutri_healthy, nutri_control
 - move_freq, move_intensity

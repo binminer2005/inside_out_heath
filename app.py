@@ -34,6 +34,7 @@ def load_users():
             'phone': '',
             'dob': '',
             'gender': '',
+            'religion': '',
             'occupation': '',
             'referrer': '',
             'scores': {
@@ -155,6 +156,7 @@ def get_demo_assessments():
                 'ho_ten': user.get('name', email),
                 'dob': user.get('dob', ''),
                 'gioi_tinh': user.get('gender', ''),
+                'ton_giao': user.get('religion', ''),
                 'nghe_nghiep': user.get('occupation', ''),
                 'goals': user.get('goals', ''),
                 'timestamp': (user.get('score_history') or [{}])[-1].get('date', ''),
@@ -174,7 +176,7 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
         except Exception:
             ws = sh.add_worksheet(title=SHEET_NAME, rows=2000, cols=60)
             headers = [
-                'timestamp', 'email', 'ho_ten', 'dob', 'gioi_tinh', 'sdt',
+                'timestamp', 'email', 'ho_ten', 'dob', 'gioi_tinh', 'ton_giao', 'sdt',
                 'nghe_nghiep', 'nguoi_gioi_thieu',
                 # Giấc ngủ
                 'sleep_hours', 'sleep_quality', 'sleep_difficulty',
@@ -198,7 +200,7 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
             ]
             ws.append_row(headers)
         headers = ws.row_values(1)
-        for header in ('chart_image', 'chart_scores'):
+        for header in ('ton_giao', 'chart_image', 'chart_scores'):
             if header not in headers:
                 ws.update_cell(1, len(headers) + 1, header)
                 headers.append(header)
@@ -221,6 +223,7 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
             user_data.get('name', ''),
             raw.get('dob', ''),
             raw.get('gender', ''),
+            raw.get('religion', ''),
             raw.get('phone', ''),
             raw.get('occupation', ''),
             raw.get('referrer', ''),
@@ -265,7 +268,23 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
             chart_formula,
             chart_scores
         ]
-        ws.append_row(row, value_input_option='USER_ENTERED')
+        row_headers = [
+            'timestamp', 'email', 'ho_ten', 'dob', 'gioi_tinh', 'ton_giao', 'sdt',
+            'nghe_nghiep', 'nguoi_gioi_thieu', 'sleep_hours', 'sleep_quality',
+            'sleep_difficulty', 'nutri_meals', 'nutri_healthy', 'nutri_control',
+            'move_freq', 'move_intensity', 'bio_routine', 'bio_energy',
+            'bio_fluctuation', 'emo_stress', 'emo_pressure', 'emo_understood',
+            'emo_share', 'emo_regulate', 'emo_express', 'emo_energy',
+            'emo_selfaware', 'spirit_body_signal', 'spirit_selftime', 'goals',
+            'want_coaching', 'score_giac_ngu', 'score_dinh_duong', 'score_van_dong',
+            'score_nhip_sinh_hoc', 'score_cam_xuc', 'score_tinh_than', 'score_avg',
+            'chart_image', 'chart_scores'
+        ]
+        row_by_header = dict(zip(row_headers, row))
+        ws.append_row(
+            [row_by_header.get(header, '') for header in headers],
+            value_input_option='USER_ENTERED'
+        )
         return True, 'Đã đồng bộ Assessment lên Google Sheet'
     except ImportError:
         return False, 'Cần cài: pip install gspread google-auth'
@@ -389,6 +408,14 @@ ASSESSMENT_SECTIONS = [
                 'required': True
             },
             {
+                'id': 'email',
+                'type': 'text',
+                'input_type': 'email',
+                'label': 'Gmail để liên kết tài khoản',
+                'placeholder': 'you@gmail.com',
+                'required': True
+            },
+            {
                 'id': 'gender',
                 'type': 'choice',
                 'label': 'Giới tính',
@@ -397,6 +424,20 @@ ASSESSMENT_SECTIONS = [
                     {'value': 'Nam', 'label': 'Nam'},
                     {'value': 'Nữ', 'label': 'Nữ'},
                     {'value': 'Khác', 'label': 'Khác / Không muốn nói'},
+                ]
+            },
+            {
+                'id': 'religion',
+                'type': 'choice',
+                'label': 'Tôn giáo',
+                'required': True,
+                'options': [
+                    {'value': 'Không có', 'label': 'Không có'},
+                    {'value': 'Phật giáo', 'label': 'Phật giáo'},
+                    {'value': 'Công giáo', 'label': 'Công giáo'},
+                    {'value': 'Tin lành', 'label': 'Tin lành'},
+                    {'value': 'Cao đài', 'label': 'Cao đài'},
+                    {'value': 'Khác', 'label': 'Khác'}
                 ]
             },
             {
@@ -856,7 +897,7 @@ def merge_guest_into_user(email):
         return False
     if guest_raw:
         user['assessment_raw'] = guest_raw
-        for k in ('name', 'dob', 'gender', 'phone', 'occupation', 'referrer', 'goals', 'want_coaching'):
+        for k in ('name', 'dob', 'gender', 'religion', 'email', 'phone', 'occupation', 'referrer', 'goals', 'want_coaching'):
             if guest_raw.get(k):
                 user[k] = guest_raw.get(k)
     if guest_scores:
@@ -929,7 +970,7 @@ def login():
                 return redirect(url_for('assessment'))
             flash('Chào mừng bạn quay lại!', 'success')
             return redirect(url_for('home'))
-        flash('Email hoặc mật khẩu không đúng. Thử demo@insideout.health / demo123', 'error')
+        flash('Email hoặc mật khẩu không đúng.', 'error')
     return render_template('login.html')
 
 
@@ -950,6 +991,7 @@ def register():
                 'phone': '',
                 'dob': '',
                 'gender': '',
+                'religion': '',
                 'occupation': '',
                 'referrer': '',
                 'scores': {k: 0 for k in PILLAR_NAMES},
@@ -970,7 +1012,8 @@ def register():
                 return redirect(url_for('map_result'))
             flash('Đăng ký thành công! Bắt đầu vẽ Bản đồ Tâm – Thể của bạn.', 'success')
             return redirect(url_for('assessment'))
-    return render_template('register.html')
+    pending = session.get('guest_assessment_raw') or {}
+    return render_template('register.html', pending=pending)
 
 
 @app.route('/logout')
@@ -1031,6 +1074,7 @@ def assessment():
             user['name'] = raw.get('name') or user.get('name') or session.get('name', '')
             user['dob'] = raw.get('dob', '')
             user['gender'] = raw.get('gender', '')
+            user['religion'] = raw.get('religion', '')
             user['phone'] = raw.get('phone', '')
             user['occupation'] = raw.get('occupation', '')
             user['referrer'] = raw.get('referrer', '')

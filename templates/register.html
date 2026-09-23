@@ -11,16 +11,19 @@
     <form method="POST">
       <div class="form-group">
         <label for="name">Tên bạn muốn được gọi</label>
-        <input type="text" id="name" name="name" placeholder="Ví dụ: Anh Tuấn" required autocomplete="name">
+        <input type="text" id="name" name="name" placeholder="Ví dụ: Anh Tuấn" value="{{ pending.name or '' }}" required autocomplete="name" {% if pending.name %}readonly{% endif %}>
       </div>
       <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="you@email.com" required autocomplete="email">
+        <label for="email">Gmail</label>
+        <input type="email" id="email" name="email" placeholder="you@gmail.com" value="{{ pending.email or '' }}" required autocomplete="email" {% if pending.email %}readonly{% endif %}>
       </div>
       <div class="form-group">
         <label for="password">Mật khẩu</label>
         <input type="password" id="password" name="password" placeholder="Ít nhất 6 ký tự" required minlength="6" autocomplete="new-password">
       </div>
+      {% if pending.email %}
+      <p class="form-hint" style="margin-bottom:1.15rem;">Gmail và tên đã được lấy từ Bản đồ của bạn. Chỉ cần đặt mật khẩu để lưu tài khoản.</p>
+      {% endif %}
       <p class="form-hint" style="margin-bottom:1.15rem;">
         Bằng việc đăng ký, bạn đồng ý với điều khoản sử dụng và chính sách bảo vệ dữ liệu.
         Đây <strong>không phải</strong> công cụ y tế.
