@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Demo - {{ assessment.ho_ten if assessment else 'Không tìm thấy' }}{% endblock %}
+{% block content %}
+{% if not assessment %}
+<div class="card demo-empty">
+  <h1 class="page-title">Không tìm thấy bản đồ</h1>
+  <p>Hồ sơ này không còn trong tab Assessments.</p>
+  <a class="btn btn-primary" href="{{ url_for('demo_maps') }}">Quay lại danh sách</a>
+</div>
+{% else %}
+<a class="demo-back" href="{{ url_for('demo_maps') }}">← Danh sách người đã vẽ</a>
+<div class="demo-detail-header">
+  <p class="eyebrow">Bản đồ Cân bằng Thể - Tâm</p>
+  <h1 class="page-title">{{ assessment.ho_ten }}</h1>
+  <p class="page-subtitle">{{ assessment.email }} · {{ assessment.timestamp or 'Chưa rõ ngày' }}</p>
+</div>
+
+<div class="card demo-chart-card">
+  <div class="demo-chart-heading">
+    <div>
+      <div class="card-title">Biểu đồ 6 trụ cột</div>
+      <p class="demo-muted">Điểm trung bình: <strong>{{ assessment.score_avg }}</strong> / 5</p>
+    </div>
+    <a class="btn btn-primary" href="{{ assessment.chart_url }}" download="insideout-{{ assessment.ho_ten|replace(' ', '-') }}.png" target="_blank" rel="noopener">Lưu ảnh biểu đồ</a>
+  </div>
+  <img class="demo-chart-image" src="{{ assessment.chart_url }}" alt="Biểu đồ 6 trụ cột của {{ assessment.ho_ten }}">
+</div>
+
+<div class="card">
+  <div class="card-title">Thông tin và thông số</div>
+  <div class="demo-info-grid">
+    <div><span>Ngày sinh</span><strong>{{ assessment.dob or '—' }}</strong></div>
+    <div><span>Giới tính</span><strong>{{ assessment.gioi_tinh or '—' }}</strong></div>
+    <div><span>Nghề nghiệp</span><strong>{{ assessment.nghe_nghiep or '—' }}</strong></div>
+    <div><span>Mục tiêu</span><strong>{{ assessment.goals or '—' }}</strong></div>
+  </div>
+  <div class="demo-score-grid">
+    {% for key, label in [('giac_ngu', 'Giấc ngủ'), ('dinh_duong', 'Dinh dưỡng'), ('van_dong', 'Vận động'), ('nhip_sinh_hoc', 'Nhịp sinh học'), ('cam_xuc', 'Cảm xúc'), ('tinh_than', 'Tinh thần')] %}
+    <div class="demo-score"><span>{{ label }}</span><strong>{{ assessment.scores[key] }}</strong></div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

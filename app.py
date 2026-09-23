@@ -114,6 +114,54 @@ def build_chart_image_url(scores):
     encoded_config = quote(json.dumps(config, ensure_ascii=False, separators=(',', ':')))
     return f'https://quickchart.io/chart?width=720&height=720&format=png&c={encoded_config}'
 
+
+def _assessment_from_sheet_row(row):
+    score_keys = (
+        'giac_ngu', 'dinh_duong', 'van_dong',
+        'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
+    )
+    scores = {}
+    for key in score_keys:
+        try:
+            scores[key] = round(float(row.get(f'score_{key}') or 0), 2)
+        except (TypeError, ValueError):
+            scores[key] = 0
+    row['scores'] = scores
+    row['score_avg'] = row.get('score_avg') or round(
+        sum(scores.values()) / len(score_keys), 2
+    )
+    row['chart_url'] = build_chart_image_url(scores)
+    image_value = str(row.get('chart_image') or '')
+    if image_value.startswith('=IMAGE("') and image_value.endswith('")'):
+        row['chart_url'] = image_value[8:-2]
+    return row
+
+
+def get_demo_assessments():
+    """Read public demo records from Assessments, with a local fallback."""
+    try:
+        gc = _get_gspread_client()
+        worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
+        rows = worksheet.get_all_records()
+        return [_assessment_from_sheet_row(dict(row)) for row in rows if row.get('ho_ten')]
+    except Exception:
+        records = []
+        for email, user in users.items():
+            if not user.get('assessment_done'):
+                continue
+            scores = user.get('scores', {})
+            records.append(_assessment_from_sheet_row({
+                'email': email,
+                'ho_ten': user.get('name', email),
+                'dob': user.get('dob', ''),
+                'gioi_tinh': user.get('gender', ''),
+                'nghe_nghiep': user.get('occupation', ''),
+                'goals': user.get('goals', ''),
+                'timestamp': (user.get('score_history') or [{}])[-1].get('date', ''),
+                **{f'score_{key}': value for key, value in scores.items()}
+            }))
+        return records
+
 def sync_assessment_to_sheets(user_email, user_data, raw, scores):
     """Append full assessment row to Google Sheet."""
     if not SPREADSHEET_ID:
@@ -845,6 +893,23 @@ def index():
     if os.path.exists(path):
         return render_template('landing_full.html')
     return render_template('landing.html')
+
+
+@app.route('/demo/maps')
+def demo_maps():
+    assessments = get_demo_assessments()
+    return render_template('demo_maps.html', assessments=assessments)
+
+
+@app.route('/demo/maps/<path:user_email>')
+def demo_map_detail(user_email):
+    assessment = next(
+        (item for item in get_demo_assessments() if item.get('email') == user_email),
+        None
+    )
+    if not assessment:
+        return render_template('demo_map_detail.html', assessment=None), 404
+    return render_template('demo_map_detail.html', assessment=assessment)
 
 
 @app.route('/login', methods=['GET', 'POST'])

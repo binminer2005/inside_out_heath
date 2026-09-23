@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Demo - Những người đã vẽ bản đồ{% endblock %}
+{% block content %}
+<div class="demo-header">
+  <div>
+    <p class="eyebrow">InsideOut HEALTH · Demo</p>
+    <h1 class="page-title">Những người đã vẽ bản đồ</h1>
+    <p class="page-subtitle">Dữ liệu được đọc từ tab Assessments trên Google Sheet.</p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('assessment') }}">Vẽ bản đồ mới</a>
+</div>
+
+{% if assessments %}
+<div class="demo-list">
+  {% for item in assessments|reverse %}
+  <a class="demo-person" href="{{ url_for('demo_map_detail', user_email=item.email) }}">
+    <div class="demo-person-main">
+      <strong>{{ item.ho_ten }}</strong>
+      <span>{{ item.email or 'Chưa có email' }}</span>
+    </div>
+    <div class="demo-person-meta">
+      <span>{{ item.timestamp or 'Chưa rõ ngày' }}</span>
+      <span>Điểm TB {{ item.score_avg }}</span>
+    </div>
+    <span class="demo-arrow">→</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card demo-empty">
+  <div class="card-title">Chưa có dữ liệu</div>
+  <p>Hãy hoàn thành một bản đồ để bản ghi xuất hiện ở đây.</p>
+</div>
+{% endif %}
+{% endblock %}
