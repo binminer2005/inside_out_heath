@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Tạo mật khẩu - InsideOut HEALTH{% endblock %}
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="text-center mb-1" style="font-size:2.2rem;">🗺️</div>
+    <h1>Khôi phục Bản đồ</h1>
+    <p class="subtitle">Đã tìm thấy Bản đồ được lưu bằng Gmail này:</p>
+    <p class="auth-footer"><strong>{{ email }}</strong></p>
+    <p class="form-hint" style="margin:1rem 0;">Bạn chỉ cần tạo mật khẩu mới. Bản đồ và các điểm số trước đó sẽ được khôi phục vào tài khoản.</p>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="password">Mật khẩu mới</label>
+        <input type="password" id="password" name="password" placeholder="Ít nhất 6 ký tự" required minlength="6" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="password_confirmation">Nhập lại mật khẩu</label>
+        <input type="password" id="password_confirmation" name="password_confirmation" placeholder="Nhập lại mật khẩu" required minlength="6" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Lưu mật khẩu và vào Bản đồ</button>
+    </form>
+
+    <p class="auth-footer"><a href="{{ url_for('login') }}">Quay lại đăng nhập</a></p>
+  </div>
+</div>
+{% endblock %}

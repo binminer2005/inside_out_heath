@@ -144,7 +144,18 @@ def get_demo_assessments():
         gc = _get_gspread_client()
         worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
         rows = worksheet.get_all_records()
-        return [_assessment_from_sheet_row(dict(row)) for row in rows if row.get('ho_ten')]
+        aliases = {
+            'Email': 'email', 'Họ và Tên': 'ho_ten', 'Ngày tháng năm sinh': 'dob',
+            'Giới tính': 'gioi_tinh', 'Tôn giáo': 'ton_giao', 'SĐT': 'sdt',
+            'Nghề nghiệp': 'nghe_nghiep', 'Mục tiêu': 'goals',
+            'score_avg': 'score_avg'
+        }
+        normalized = []
+        for row in rows:
+            item = {aliases.get(key, key): value for key, value in dict(row).items()}
+            if item.get('ho_ten') or item.get('email'):
+                normalized.append(_assessment_from_sheet_row(item))
+        return normalized
     except Exception:
         records = []
         for email, user in users.items():
@@ -163,6 +174,39 @@ def get_demo_assessments():
                 **{f'score_{key}': value for key, value in scores.items()}
             }))
         return records
+
+
+def find_sheet_assessment(email):
+    email = email.strip().lower()
+    matches = [item for item in get_demo_assessments()
+               if str(item.get('email', '')).strip().lower() == email]
+    return matches[-1] if matches else None
+
+
+def restore_account_from_assessment(email, password, assessment):
+    scores = assessment.get('scores', {})
+    user = {
+        'password': password,
+        'name': assessment.get('ho_ten') or email,
+        'phone': assessment.get('sdt', ''),
+        'dob': assessment.get('dob', ''),
+        'gender': assessment.get('gioi_tinh', ''),
+        'religion': assessment.get('ton_giao', ''),
+        'occupation': assessment.get('nghe_nghiep', ''),
+        'referrer': '',
+        'scores': scores,
+        'score_history': [{'date': str(assessment.get('timestamp', ''))[:10],
+                           'scores': scores, 'source': 'sheet_restore'}],
+        'assessment_raw': {'email': email, 'name': assessment.get('ho_ten', '')},
+        'assessment_done': True,
+        'habit': None,
+        'checkins': [],
+        'want_coaching': None,
+        'goals': assessment.get('goals', '')
+    }
+    users[email] = user
+    save_users(users)
+    return user
 
 def sync_assessment_to_sheets(user_email, user_data, raw, scores):
     """Append full assessment row to Google Sheet."""
@@ -970,8 +1014,38 @@ def login():
                 return redirect(url_for('assessment'))
             flash('Chào mừng bạn quay lại!', 'success')
             return redirect(url_for('home'))
+        if email and email not in users:
+            assessment = find_sheet_assessment(email)
+            if assessment:
+                session['claim_email'] = email
+                session['claim_assessment'] = assessment
+                return redirect(url_for('claim_account'))
         flash('Email hoặc mật khẩu không đúng.', 'error')
     return render_template('login.html')
+
+
+@app.route('/claim-account', methods=['GET', 'POST'])
+def claim_account():
+    email = session.get('claim_email', '')
+    assessment = session.get('claim_assessment')
+    if not email or not assessment:
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirmation = request.form.get('password_confirmation', '')
+        if len(password) < 6:
+            flash('Mật khẩu cần có ít nhất 6 ký tự.', 'error')
+        elif password != confirmation:
+            flash('Hai lần nhập mật khẩu chưa giống nhau.', 'error')
+        else:
+            restore_account_from_assessment(email, password, assessment)
+            session.pop('claim_email', None)
+            session.pop('claim_assessment', None)
+            session['user'] = email
+            session['name'] = users[email]['name']
+            flash('Đã khôi phục Bản đồ. Từ lần sau bạn chỉ cần đăng nhập bằng Gmail và mật khẩu.', 'success')
+            return redirect(url_for('map_result'))
+    return render_template('claim_account.html', email=email, assessment=assessment)
 
 
 @app.route('/register', methods=['GET', 'POST'])
