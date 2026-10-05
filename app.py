@@ -1601,13 +1601,19 @@ def assessment():
         ]
         if missing:
             flash('Vui lòng hoàn thành tất cả câu hỏi bắt buộc trước khi xem bản đồ.', 'error')
+            active_step = next(
+                index for index, section in enumerate(ASSESSMENT_SECTIONS)
+                if any(q.get('required') and not raw.get(q['id']) for q in section['questions'])
+            )
             return render_template(
                 'assessment.html',
                 sections=ASSESSMENT_SECTIONS,
                 pillar_names=PILLAR_NAMES,
                 name=raw.get('name') or 'Bạn',
                 is_guest=('user' not in session),
-                submission_id=submission_id
+                submission_id=submission_id,
+                form_values=raw,
+                active_step=active_step
             )
 
         scores = compute_scores(raw)
@@ -1682,7 +1688,9 @@ def assessment():
                            pillar_names=PILLAR_NAMES,
                            name=display_name,
                            is_guest=('user' not in session),
-                           submission_id=submission_id)
+                           submission_id=submission_id,
+                           form_values={},
+                           active_step=0)
 
 
 @app.route('/map')

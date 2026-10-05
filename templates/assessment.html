@@ -72,6 +72,12 @@
     color: var(--text); line-height: 1.4;
   }
   .q-hint { font-size: 0.78rem; font-weight: 600; color: var(--text-light); margin-top: 0.15rem; }
+  .scale-guidance {
+    display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; align-items: baseline;
+    margin-bottom: 0.6rem; padding: 0.6rem 0.75rem; border-radius: 10px;
+    background: var(--primary-light); color: var(--forest); font-size: 0.82rem; line-height: 1.4;
+  }
+  .scale-guidance strong { white-space: nowrap; }
 
   .choice-list { display: flex; flex-direction: column; gap: 0.45rem; }
   .choice-opt { display: block; cursor: pointer; }
@@ -223,7 +229,7 @@
 
   <div class="section-pills" id="sectionPills">
     {% for s in sections %}
-    <div class="section-pill {% if loop.first %}active{% endif %}" data-idx="{{ loop.index0 }}">
+    <div class="section-pill {% if loop.index0 == active_step|default(0)|int %}active{% endif %}" data-idx="{{ loop.index0 }}">
       {{ s.icon }} {{ s.title }}
     </div>
     {% endfor %}
@@ -234,7 +240,7 @@
     <input type="hidden" name="submission_id" value="{{ submission_id }}">
     <div class="assess-panel">
       {% for section in sections %}
-      <div class="assess-step {% if loop.first %}active{% endif %}"
+      <div class="assess-step {% if loop.index0 == active_step|default(0)|int %}active{% endif %}"
            data-step="{{ loop.index0 }}"
            data-section="{{ section.id }}">
         <div class="section-card">
@@ -245,11 +251,12 @@
           </div>
 
           {% for q in section.questions %}
+          {% set saved_value = (form_values|default({})).get(q.id, '') %}
           <div class="q-block" data-qid="{{ q.id }}">
             <div class="q-label">
               {{ q.label }}
               {% if q.required %}<span style="color:#E07A5F">*</span>{% endif %}
-              {% if q.hint %}<div class="q-hint">{{ q.hint }}</div>{% endif %}
+              {% if q.hint and q.type != 'scale' %}<div class="q-hint">{{ q.hint }}</div>{% endif %}
             </div>
 
             {% if q.type == 'choice' %}
@@ -257,35 +264,37 @@
               {% for opt in q.options %}
               <label class="choice-opt">
                 <input type="radio" name="{{ q.id }}" value="{{ opt.value }}"
-                       {% if q.required and loop.first %}required{% endif %}>
+                       {% if q.required and loop.first %}required{% endif %}
+                       {% if saved_value|string == opt.value|string %}checked{% endif %}>
                 <div class="opt-box">{{ opt.label }}</div>
               </label>
               {% endfor %}
             </div>
 
             {% elif q.type == 'scale' %}
+            <div class="scale-guidance"><strong>Ý nghĩa thang điểm</strong><span>{{ q.hint or 'Chọn mức phù hợp nhất với bạn.' }}</span></div>
             <div class="scale-row">
               {% for i in range(q.min, q.max + 1) %}
               <label>
                 <input type="radio" name="{{ q.id }}" value="{{ i }}"
-                       {% if i == 3 %}checked{% endif %}
+                       {% if (saved_value|default('3'))|string == i|string %}checked{% endif %}
                        {% if q.required %}required{% endif %}>
                 <span class="num">{{ i }}</span>
               </label>
               {% endfor %}
             </div>
-            <div class="scale-ends"><span>Thấp</span><span>Cao</span></div>
 
             {% elif q.type == 'textarea' %}
             <textarea class="text-area" name="{{ q.id }}"
                       placeholder="{{ q.placeholder or '' }}"
-                      {% if q.required %}required{% endif %}></textarea>
+                      {% if q.required %}required{% endif %}>{{ saved_value }}</textarea>
 
             {% else %}
             <input class="text-input"
                    type="{{ q.input_type or 'text' }}"
                    name="{{ q.id }}"
                    placeholder="{{ q.placeholder or '' }}"
+                   value="{{ saved_value }}"
                    {% if q.required %}required{% endif %}>
             {% endif %}
           </div>
@@ -347,7 +356,7 @@
 (function () {
   const totalSections = {{ sections|length }};
   const totalSteps = totalSections + 1;
-  let current = 0;
+  let current = {{ active_step|default(0)|int }};
 
   const steps = document.querySelectorAll('.assess-step');
   const pills = document.querySelectorAll('.section-pill');
