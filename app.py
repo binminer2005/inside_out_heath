@@ -3,63 +3,172 @@ INSIDEOUT HEALTH – Demo v4
 Full detailed assessment (form chuẩn) • Multi-step • Score engine • Google Sheets sync
 """
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import json
+import hashlib
+import secrets
+import smtplib
+import ssl
+import html
+import unicodedata
+from email.message import EmailMessage
 from copy import deepcopy
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
+from sqlalchemy import create_engine, text, inspect
+from werkzeug.security import check_password_hash, generate_password_hash
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get(
     'SECRET_KEY',
     'insideout-health-demo-development-key'
 )
+def _google_oauth_credentials():
+    client_id = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+    client_secret = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
+    credential_file = os.environ.get('GOOGLE_OAUTH_CLIENT_FILE', '').strip()
+    if credential_file:
+        if not os.path.isabs(credential_file):
+            credential_file = os.path.join(os.path.dirname(__file__), credential_file)
+        try:
+            with open(credential_file, 'r', encoding='utf-8') as credential_stream:
+                credentials = json.load(credential_stream)
+            web_credentials = credentials.get('web') or credentials.get('installed') or credentials
+            client_id = client_id or str(web_credentials.get('client_id') or '').strip()
+            client_secret = client_secret or str(web_credentials.get('client_secret') or '').strip()
+        except (OSError, ValueError) as error:
+            raise RuntimeError(f'Không đọc được file OAuth Google: {credential_file}') from error
+    return client_id, client_secret
+
+
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET = _google_oauth_credentials()
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', '').strip()
+google_login_enabled = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+oauth = None
+if google_login_enabled:
+    from authlib.integrations.flask_client import OAuth
+    oauth = OAuth(app)
+    oauth.register(
+        name='google',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_kwargs={'scope': 'openid email profile'},
+    )
 
 # ─── Persistence (local JSON) ───────────────────────────────────────────────
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
-USERS_FILE = os.path.join(DATA_DIR, 'users.json')
+USERS_FILE = os.path.join(DATA_DIR, 'users.json')  # one-time legacy import
+
+def _database_url():
+    configured = os.environ.get('DATABASE_URL', '').strip()
+    if configured:
+        # Common hosting providers still supply the legacy SQLAlchemy scheme.
+        if configured.startswith('postgres://'):
+            configured = 'postgresql+psycopg://' + configured[len('postgres://'):]
+        elif configured.startswith('postgresql://'):
+            configured = 'postgresql+psycopg://' + configured[len('postgresql://'):]
+        return configured
+    return 'sqlite:///' + os.path.join(DATA_DIR, 'insideout.db').replace('\\', '/')
+
+DATABASE_URL = _database_url()
+engine = create_engine(DATABASE_URL, future=True)
+
+def _init_database():
+    with engine.begin() as conn:
+        conn.execute(text('''CREATE TABLE IF NOT EXISTS users (
+            email VARCHAR(320) PRIMARY KEY,
+            data TEXT NOT NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'user'
+        )'''))
+        # Upgrade existing installations whose account table only had JSON data.
+        user_columns = {column['name'] for column in inspect(conn).get_columns('users')}
+        if 'role' not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"))
+            for row in conn.execute(text('SELECT email, data FROM users')).mappings():
+                try:
+                    legacy_role = json.loads(row['data']).get('role', 'user')
+                except (TypeError, ValueError):
+                    legacy_role = 'user'
+                if legacy_role not in ('admin', 'user'):
+                    legacy_role = 'user'
+                conn.execute(text('UPDATE users SET role = :role WHERE email = :email'),
+                             {'role': legacy_role, 'email': row['email']})
+        if engine.dialect.name == 'sqlite':
+            conn.execute(text('''CREATE TABLE IF NOT EXISTS map_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL, created_at TEXT NOT NULL,
+                raw_data TEXT NOT NULL, scores TEXT NOT NULL
+            )'''))
+        else:
+            conn.execute(text('''CREATE TABLE IF NOT EXISTS map_history (
+                id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                email VARCHAR(320) NOT NULL, created_at VARCHAR(40) NOT NULL,
+                raw_data TEXT NOT NULL, scores TEXT NOT NULL
+            )'''))
+        conn.execute(text('''CREATE TABLE IF NOT EXISTS password_resets (
+            token_hash VARCHAR(64) PRIMARY KEY,
+            email VARCHAR(320) NOT NULL,
+            expires_at VARCHAR(40) NOT NULL,
+            used_at VARCHAR(40)
+        )'''))
+        conn.execute(text('''CREATE TABLE IF NOT EXISTS assessment_syncs (
+            submission_id VARCHAR(128) PRIMARY KEY,
+            status VARCHAR(20) NOT NULL,
+            updated_at VARCHAR(40) NOT NULL
+        )'''))
 
 def load_users():
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
-        'demo@insideout.health': {
-            'password': 'demo123',
-            'name': 'Anh Tuấn',
-            'phone': '',
-            'dob': '',
-            'gender': '',
-            'religion': '',
-            'occupation': '',
-            'referrer': '',
-            'scores': {
-                'giac_ngu': 4,
-                'dinh_duong': 2,
-                'van_dong': 3,
-                'nhip_sinh_hoc': 1,
-                'cam_xuc': 2,
-                'tinh_than': 2
-            },
-            'score_history': [],
-            'assessment_raw': {},
-            'assessment_done': True,
-            'habit': None,
-            'checkins': [],
-            'want_coaching': None,
-            'goals': ''
-        }
-    }
+    _init_database()
+    with engine.begin() as conn:
+        rows = conn.execute(text('SELECT email, data, role FROM users')).mappings().all()
+        if rows:
+            loaded = {}
+            for row in rows:
+                user = json.loads(row['data'])
+                user['role'] = row['role'] or 'user'
+                loaded[row['email']] = user
+            return loaded
+        if os.path.exists(USERS_FILE):
+            try:
+                with open(USERS_FILE, 'r', encoding='utf-8') as f:
+                    legacy = json.load(f)
+                for email, user in legacy.items():
+                    if user.get('password'):
+                        user['password'] = generate_password_hash(user['password'])
+                    user.setdefault('role', 'user')
+                    conn.execute(text('INSERT INTO users (email, data, role) VALUES (:email, :data, :role)'),
+                                 {'email': email, 'data': json.dumps(user, ensure_ascii=False),
+                                  'role': user['role']})
+                    for item in user.get('score_history', []):
+                        conn.execute(text('''INSERT INTO map_history (email, created_at, raw_data, scores)
+                            VALUES (:email, :created_at, :raw_data, :scores)'''), {
+                            'email': email, 'created_at': item.get('date') or datetime.now().isoformat(timespec='seconds'),
+                            'raw_data': json.dumps(user.get('assessment_raw', {}), ensure_ascii=False),
+                            'scores': json.dumps(item.get('scores', user.get('scores', {})), ensure_ascii=False)
+                        })
+                return legacy
+            except Exception:
+                pass
+    return {}
 
 def save_users(users_data):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users_data, f, ensure_ascii=False, indent=2)
+    with engine.begin() as conn:
+        for email, user in users_data.items():
+            user.setdefault('role', 'user')
+            conn.execute(text('''INSERT INTO users (email, data, role) VALUES (:email, :data, :role)
+                ON CONFLICT (email) DO UPDATE SET data = EXCLUDED.data, role = EXCLUDED.role'''),
+                {'email': email, 'data': json.dumps(user, ensure_ascii=False), 'role': user['role']})
 
 users = load_users()
+_admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
+if _admin_email and _admin_email in users and users[_admin_email].get('role') != 'admin':
+    users[_admin_email]['role'] = 'admin'
+    save_users(users)
 
 # ─── Google Sheets ──────────────────────────────────────────────────────────
 # Spreadsheet ID từ link bạn gửi
@@ -69,6 +178,44 @@ SPREADSHEET_ID = os.environ.get(
 )
 SHEET_NAME = 'Assessments'
 CHECKIN_SHEET = 'Checkins'
+ASSESSMENT_SHEET_COLUMNS = [
+    ('timestamp', 'timestamp'), ('Email', 'email'), ('Họ và Tên', 'name'),
+    ('Ngày tháng năm sinh', 'dob'), ('Giới tính', 'gender'), ('ton_giao', 'religion'),
+    ('SĐT', 'phone'), ('Nghề nghiệp', 'occupation'), ('Tên Người giới thiệu', 'referrer'),
+    ('Bạn ngủ trung bình mỗi ngày bao nhiêu giờ?', 'sleep_hours'),
+    ('Chất lượng giấc ngủ của bạn thế nào? (1 = rất kém, 5 = rất tốt)', 'sleep_quality'),
+    ('Bạn có khó ngủ / thức giấc giữa đêm không?', 'sleep_difficulty'),
+    ('Bạn ăn đủ 3 bữa mỗi ngày không?', 'nutri_meals'),
+    ('Bạn ăn thực phẩm tốt cho sức khỏe (rau, trái cây, ít dầu mỡ) với tần suất nào?', 'nutri_healthy'),
+    ('Mức độ thèm ăn hoặc mất kiểm soát khi ăn?', 'nutri_control'),
+    ('Bạn vận động thể chất bao nhiêu lần/tuần?', 'move_freq'),
+    ('Cường độ vận động', 'move_intensity'),
+    ('Bạn duy trì giờ giấc sinh hoạt mỗi ngày có đều không?', 'bio_routine'),
+    ('Bạn cảm thấy cơ thể mình năng lượng gần đây như thế nào?', 'bio_energy'),
+    ('Mức năng lượng ban ngày của bạn dao động ra sao?', 'bio_fluctuation'),
+    ('Mức độ căng thẳng', 'emo_stress'),
+    ('Bạn có cảm thấy áp lực từ công việc / mối quan hệ / gia đình?', 'emo_pressure'),
+    ('Bạn cảm thấy bản thân được thấu hiểu và lắng nghe?', 'emo_understood'),
+    ('Bạn có ai để chia sẻ khi mệt mỏi?', 'emo_share'),
+    ('Bạn điều chỉnh được cảm xúc tiêu cực (lo âu, buồn, tủi thân…) ở mức nào?', 'emo_regulate'),
+    ('Bạn có xu hướng kìm nén hay bộc lộ cảm xúc?', 'emo_express'),
+    ('Hiện tại bạn cảm thấy năng lượng cảm xúc ở mức nào?', 'emo_energy'),
+    ('Mức độ cơ thể báo hiệu stress (mệt, mất ngủ, đau đầu…)?', 'spirit_body_signal'),
+    ('Bạn có dành thời gian cho bản thân (nghỉ, thiền, viết nhật ký…)?', 'spirit_selftime'),
+    ('Mức độ tĩnh lặng bên trong bạn cảm nhận được?', 'spirit_inner_calm'),
+    ('Nhận xét và mong muốn', 'goals'), ('Có muốn nhận kết quả không?', 'want_coaching'),
+    ('score_giac_ngu', 'score_giac_ngu'), ('score_dinh_duong', 'score_dinh_duong'),
+    ('score_van_dong', 'score_van_dong'), ('score_nhip_sinh_hoc', 'score_nhip_sinh_hoc'),
+    ('score_cam_xuc', 'score_cam_xuc'), ('score_tinh_than', 'score_tinh_than'),
+    ('score_avg', 'score_avg'), ('chart_image', 'chart_image'),
+    ('chart_scores', 'chart_scores'), ('assessment_raw_json', 'assessment_raw_json')
+]
+ASSESSMENT_SHEET_HEADERS = [header for header, _ in ASSESSMENT_SHEET_COLUMNS]
+CHECKIN_SHEET_HEADERS = [
+    'timestamp', 'email', 'name', 'mood', 'habit_done', 'habit_title', 'note',
+    'sleep_hours', 'water_glasses', 'activity_minutes',
+    'giac_ngu', 'dinh_duong', 'van_dong', 'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
+]
 
 def _get_gspread_client():
     import gspread
@@ -186,7 +333,8 @@ def find_sheet_assessment(email):
 def restore_account_from_assessment(email, password, assessment):
     scores = assessment.get('scores', {})
     user = {
-        'password': password,
+        'password': generate_password_hash(password),
+        'role': 'user',
         'name': assessment.get('ho_ten') or email,
         'phone': assessment.get('sdt', ''),
         'dob': assessment.get('dob', ''),
@@ -208,46 +356,117 @@ def restore_account_from_assessment(email, password, assessment):
     save_users(users)
     return user
 
-def sync_assessment_to_sheets(user_email, user_data, raw, scores):
+
+def _normalize_sheet_header(value):
+    text_value = html.unescape(str(value or '')).strip().casefold()
+    decomposed = unicodedata.normalize('NFKD', text_value)
+    return ''.join(char for char in decomposed
+                   if not unicodedata.combining(char) and char.isalnum())
+
+
+def _assessment_sheet_field_map():
+    mapping = {
+        _normalize_sheet_header(header): field
+        for header, field in ASSESSMENT_SHEET_COLUMNS
+    }
+    # Match existing sheets created from earlier versions of the assessment.
+    mapping.update({
+        _normalize_sheet_header(alias): field for alias, field in {
+            'email': 'email', 'ho_ten': 'name', 'Họ và tên': 'name',
+            'name': 'name', 'dob': 'dob', 'Ngày tháng năm sinh': 'dob',
+            'gioi_tinh': 'gender', 'Giới tính': 'gender', 'gender': 'gender',
+            'ton_giao': 'religion', 'Tôn giáo': 'religion', 'religion': 'religion',
+            'sdt': 'phone', 'SĐT': 'phone', 'phone': 'phone',
+            'nghe_nghiep': 'occupation', 'Nghề nghiệp': 'occupation',
+            'occupation': 'occupation', 'nguoi_gioi_thieu': 'referrer',
+            'Tên người giới thiệu': 'referrer', 'referrer': 'referrer',
+            'Mục tiêu': 'goals', 'goals': 'goals',
+            'Bạn có muốn được tham vấn 1:1 với huấn luyện viên InsideOut Health?': 'want_coaching',
+            'want_coaching': 'want_coaching',
+            'Chất lượng giấc ngủ của bạn thế nào? (1 = rất kém · 5 = rất tốt)': 'sleep_quality',
+            'Chất lượng giấc ngủ của bạn thế nào? 1 = rất kém, 5 = rất tốt': 'sleep_quality',
+            'Có muốn nhận kết quả không?': 'want_coaching',
+            'Nhận xét và mong muốn': 'goals',
+            'assessment_raw_json': 'assessment_raw_json',
+            'chart_image': 'chart_image', 'chart_scores': 'chart_scores',
+            'score_avg': 'score_avg', 'score_giac_ngu': 'score_giac_ngu',
+            'score_dinh_duong': 'score_dinh_duong', 'score_van_dong': 'score_van_dong',
+            'score_nhip_sinh_hoc': 'score_nhip_sinh_hoc', 'score_cam_xuc': 'score_cam_xuc',
+            'score_tinh_than': 'score_tinh_than'
+        }.items()
+    })
+    for section in ASSESSMENT_SECTIONS:
+        for question in section['questions']:
+            mapping[_normalize_sheet_header(question['id'])] = question['id']
+            mapping[_normalize_sheet_header(question['label'])] = question['id']
+    return mapping
+
+def _update_assessment_sync(submission_id, status):
+    with engine.begin() as conn:
+        conn.execute(text('''UPDATE assessment_syncs SET status = :status, updated_at = :updated_at
+            WHERE submission_id = :submission_id'''), {
+            'status': status, 'updated_at': datetime.now().astimezone().isoformat(),
+            'submission_id': submission_id
+        })
+
+
+def sync_assessment_to_sheets(user_email, user_data, raw, scores, submission_id=None):
     """Append full assessment row to Google Sheet."""
     if not SPREADSHEET_ID:
         return False, 'Chưa cấu hình SPREADSHEET_ID'
+    submission_id = submission_id or secrets.token_urlsafe(24)
     try:
+        now = datetime.now().astimezone()
+        with engine.begin() as conn:
+            inserted = conn.execute(text('''INSERT INTO assessment_syncs
+                (submission_id, status, updated_at) VALUES (:submission_id, 'processing', :updated_at)
+                ON CONFLICT (submission_id) DO NOTHING'''), {
+                'submission_id': submission_id, 'updated_at': now.isoformat()
+            })
+            if inserted.rowcount == 0:
+                previous = conn.execute(text('''SELECT status, updated_at FROM assessment_syncs
+                    WHERE submission_id = :submission_id'''), {'submission_id': submission_id}).mappings().first()
+                if previous and previous['status'] == 'synced':
+                    return True, 'Bài làm này đã được đồng bộ trước đó'
+                if previous and previous['status'] == 'processing':
+                    try:
+                        age = now - datetime.fromisoformat(previous['updated_at'])
+                    except (TypeError, ValueError):
+                        age = timedelta(minutes=11)
+                    if age < timedelta(minutes=10):
+                        return True, 'Bài làm này đang được đồng bộ'
+                conn.execute(text('''UPDATE assessment_syncs SET status = 'processing', updated_at = :updated_at
+                    WHERE submission_id = :submission_id'''), {
+                    'updated_at': now.isoformat(), 'submission_id': submission_id
+                })
         gc = _get_gspread_client()
         sh = gc.open_by_key(SPREADSHEET_ID)
         try:
             ws = sh.worksheet(SHEET_NAME)
         except Exception:
             ws = sh.add_worksheet(title=SHEET_NAME, rows=2000, cols=60)
-            headers = [
-                'timestamp', 'email', 'ho_ten', 'dob', 'gioi_tinh', 'ton_giao', 'sdt',
-                'nghe_nghiep', 'nguoi_gioi_thieu',
-                # Giấc ngủ
-                'sleep_hours', 'sleep_quality', 'sleep_difficulty',
-                # Dinh dưỡng
-                'nutri_meals', 'nutri_healthy', 'nutri_control',
-                # Vận động
-                'move_freq', 'move_intensity',
-                # Nhịp sinh học
-                'bio_routine', 'bio_energy', 'bio_fluctuation',
-                # Cảm xúc
-                'emo_stress', 'emo_pressure', 'emo_understood', 'emo_share',
-                'emo_regulate', 'emo_express', 'emo_energy', 'emo_selfaware',
-                # Tinh thần
-                'spirit_body_signal', 'spirit_selftime',
-                # Goals
-                'goals', 'want_coaching',
-                # Computed scores
-                'score_giac_ngu', 'score_dinh_duong', 'score_van_dong',
-                'score_nhip_sinh_hoc', 'score_cam_xuc', 'score_tinh_than',
-                'score_avg', 'chart_image', 'chart_scores'
-            ]
-            ws.append_row(headers)
+            ws.append_row(ASSESSMENT_SHEET_HEADERS)
         headers = ws.row_values(1)
-        for header in ('ton_giao', 'chart_image', 'chart_scores'):
-            if header not in headers:
-                ws.update_cell(1, len(headers) + 1, header)
-                headers.append(header)
+        header_field_map = _assessment_sheet_field_map()
+        normalized_fields = [
+            header_field_map.get(_normalize_sheet_header(header)) for header in headers
+        ]
+        present_fields = {field for field in normalized_fields if field}
+        missing_columns = [
+            (header, field) for header, field in ASSESSMENT_SHEET_COLUMNS
+            if field not in present_fields
+        ]
+        if missing_columns:
+            field_order = {field: index for index, (_, field) in enumerate(ASSESSMENT_SHEET_COLUMNS)}
+            for header, field in missing_columns:
+                insertion_index = next((index for index, existing_field in enumerate(normalized_fields)
+                                        if existing_field in field_order and
+                                        field_order[existing_field] > field_order[field]),
+                                       len(headers))
+                ws.insert_cols([[header]], col=insertion_index + 1,
+                               value_input_option='RAW', inherit_from_before=insertion_index > 0)
+                headers.insert(insertion_index, header)
+                normalized_fields.insert(insertion_index, field)
 
         score_values = [scores.get(key, '') for key in (
             'giac_ngu', 'dinh_duong', 'van_dong', 'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
@@ -261,78 +480,32 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores):
             )
         )
 
-        row = [
-            datetime.now().isoformat(timespec='seconds'),
-            user_email,
-            user_data.get('name', ''),
-            raw.get('dob', ''),
-            raw.get('gender', ''),
-            raw.get('religion', ''),
-            raw.get('phone', ''),
-            raw.get('occupation', ''),
-            raw.get('referrer', ''),
-            # Sleep
-            raw.get('sleep_hours', ''),
-            raw.get('sleep_quality', ''),
-            raw.get('sleep_difficulty', ''),
-            # Nutri
-            raw.get('nutri_meals', ''),
-            raw.get('nutri_healthy', ''),
-            raw.get('nutri_control', ''),
-            # Move
-            raw.get('move_freq', ''),
-            raw.get('move_intensity', ''),
-            # Bio
-            raw.get('bio_routine', ''),
-            raw.get('bio_energy', ''),
-            raw.get('bio_fluctuation', ''),
-            # Emo
-            raw.get('emo_stress', ''),
-            raw.get('emo_pressure', ''),
-            raw.get('emo_understood', ''),
-            raw.get('emo_share', ''),
-            raw.get('emo_regulate', ''),
-            raw.get('emo_express', ''),
-            raw.get('emo_energy', ''),
-            raw.get('emo_selfaware', ''),
-            # Spirit
-            raw.get('spirit_body_signal', ''),
-            raw.get('spirit_selftime', ''),
-            # Goals
-            raw.get('goals', ''),
-            raw.get('want_coaching', ''),
-            # Scores
-            scores.get('giac_ngu', ''),
-            scores.get('dinh_duong', ''),
-            scores.get('van_dong', ''),
-            scores.get('nhip_sinh_hoc', ''),
-            scores.get('cam_xuc', ''),
-            scores.get('tinh_than', ''),
-            round(sum(scores.values()) / max(len(scores), 1), 2) if scores else '',
-            chart_formula,
-            chart_scores
-        ]
-        row_headers = [
-            'timestamp', 'email', 'ho_ten', 'dob', 'gioi_tinh', 'ton_giao', 'sdt',
-            'nghe_nghiep', 'nguoi_gioi_thieu', 'sleep_hours', 'sleep_quality',
-            'sleep_difficulty', 'nutri_meals', 'nutri_healthy', 'nutri_control',
-            'move_freq', 'move_intensity', 'bio_routine', 'bio_energy',
-            'bio_fluctuation', 'emo_stress', 'emo_pressure', 'emo_understood',
-            'emo_share', 'emo_regulate', 'emo_express', 'emo_energy',
-            'emo_selfaware', 'spirit_body_signal', 'spirit_selftime', 'goals',
-            'want_coaching', 'score_giac_ngu', 'score_dinh_duong', 'score_van_dong',
-            'score_nhip_sinh_hoc', 'score_cam_xuc', 'score_tinh_than', 'score_avg',
-            'chart_image', 'chart_scores'
-        ]
-        row_by_header = dict(zip(row_headers, row))
+        row_by_field = {
+            'timestamp': datetime.now().isoformat(timespec='seconds'),
+            'email': user_email or raw.get('email', ''),
+            'name': user_data.get('name') or raw.get('name', ''),
+            'dob': raw.get('dob', ''), 'gender': raw.get('gender', ''),
+            'religion': raw.get('religion', ''), 'phone': raw.get('phone', ''),
+            'occupation': raw.get('occupation', ''), 'referrer': raw.get('referrer', ''),
+            'goals': raw.get('goals', ''), 'want_coaching': raw.get('want_coaching', ''),
+            'spirit_inner_calm': raw.get('spirit_inner_calm', ''),
+            'score_avg': round(sum(scores.values()) / max(len(scores), 1), 2) if scores else '',
+            'chart_image': chart_formula, 'chart_scores': chart_scores,
+            'assessment_raw_json': json.dumps(raw, ensure_ascii=False, separators=(',', ':'))
+        }
+        row_by_field.update(raw)
+        row_by_field.update({f'score_{key}': value for key, value in scores.items()})
         ws.append_row(
-            [row_by_header.get(header, '') for header in headers],
+            [row_by_field.get(field, '') if field else '' for field in normalized_fields],
             value_input_option='USER_ENTERED'
         )
+        _update_assessment_sync(submission_id, 'synced')
         return True, 'Đã đồng bộ Assessment lên Google Sheet'
     except ImportError:
+        _update_assessment_sync(submission_id, 'failed')
         return False, 'Cần cài: pip install gspread google-auth'
     except Exception as e:
+        _update_assessment_sync(submission_id, 'failed')
         return False, f'Lỗi sync: {str(e)[:150]}'
 
 
@@ -346,28 +519,28 @@ def sync_checkin_to_sheets(user_email, payload):
             ws = sh.worksheet(CHECKIN_SHEET)
         except Exception:
             ws = sh.add_worksheet(title=CHECKIN_SHEET, rows=2000, cols=16)
-            ws.append_row([
-                'timestamp', 'email', 'name', 'mood', 'habit_done',
-                'habit_title', 'note',
-                'giac_ngu', 'dinh_duong', 'van_dong',
-                'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
-            ])
-        row = [
-            datetime.now().isoformat(timespec='seconds'),
-            user_email,
-            payload.get('name', ''),
-            payload.get('mood', ''),
-            payload.get('habit_done', ''),
-            payload.get('habit_title', ''),
-            payload.get('note', ''),
-            payload.get('scores', {}).get('giac_ngu', ''),
-            payload.get('scores', {}).get('dinh_duong', ''),
-            payload.get('scores', {}).get('van_dong', ''),
-            payload.get('scores', {}).get('nhip_sinh_hoc', ''),
-            payload.get('scores', {}).get('cam_xuc', ''),
-            payload.get('scores', {}).get('tinh_than', ''),
-        ]
-        ws.append_row(row)
+            ws.append_row(CHECKIN_SHEET_HEADERS)
+        headers = ws.row_values(1)
+        missing_headers = [header for header in CHECKIN_SHEET_HEADERS if header not in headers]
+        if missing_headers:
+            headers.extend(missing_headers)
+            if len(headers) > ws.col_count:
+                ws.add_cols(len(headers) - ws.col_count)
+            ws.update('A1', [headers], value_input_option='RAW')
+        row_by_header = {
+            'timestamp': datetime.now().isoformat(timespec='seconds'),
+            'email': user_email,
+            'name': payload.get('name', ''),
+            'mood': payload.get('mood', ''),
+            'habit_done': payload.get('habit_done', ''),
+            'habit_title': payload.get('habit_title', ''),
+            'note': payload.get('note', ''),
+            'sleep_hours': payload.get('sleep_hours', ''),
+            'water_glasses': payload.get('water_glasses', ''),
+            'activity_minutes': payload.get('activity_minutes', ''),
+            **payload.get('scores', {})
+        }
+        ws.append_row([row_by_header.get(header, '') for header in headers])
         return True, 'Đã đồng bộ Check-in'
     except Exception as e:
         return False, str(e)[:120]
@@ -772,6 +945,14 @@ ASSESSMENT_SECTIONS = [
                     {'value': '5', 'label': 'Hằng ngày'},
                 ]
             },
+            {
+                'id': 'spirit_inner_calm',
+                'type': 'scale',
+                'label': 'Mức độ tĩnh lặng bên trong bạn cảm nhận được?',
+                'hint': '1 = hầu như không cảm nhận · 5 = cảm nhận rõ rệt',
+                'required': True,
+                'min': 1, 'max': 5
+            },
         ]
     },
     {
@@ -883,6 +1064,7 @@ def compute_scores(raw: dict) -> dict:
     tinh_than = _weighted_avg([
         (_to_num(raw.get('spirit_body_signal')), 1.5),  # dấu hiệu stress cơ thể
         (_to_num(raw.get('spirit_selftime')),    2.0),  # thời gian cho bản thân ★
+        (_to_num(raw.get('spirit_inner_calm')),  1.5),  # tĩnh lặng bên trong
     ])
 
     return {
@@ -933,6 +1115,7 @@ def merge_guest_into_user(email):
     guest_scores = session.pop('guest_scores', None)
     guest_raw = session.pop('guest_assessment_raw', None)
     guest_synced = session.pop('guest_assessment_synced', False)
+    guest_submission_id = session.pop('guest_assessment_submission_id', None)
     guest_habit = session.pop('guest_habit', None)
     if not guest_scores and not guest_raw:
         return False
@@ -954,13 +1137,19 @@ def merge_guest_into_user(email):
         })
         user['score_history'] = history[-12:]
         user['assessment_done'] = True
+        with engine.begin() as conn:
+            conn.execute(text('INSERT INTO map_history (email, created_at, raw_data, scores) VALUES (:email, :created_at, :raw_data, :scores)'), {
+                'email': email, 'created_at': datetime.now().isoformat(timespec='seconds'),
+                'raw_data': json.dumps(guest_raw or {}, ensure_ascii=False),
+                'scores': json.dumps(guest_scores, ensure_ascii=False)
+            })
     if guest_habit:
         user['habit'] = guest_habit
     save_users(users)
 
     # Sync an assessment completed before registration after the user has an email.
     if guest_raw and guest_scores and not guest_synced:
-        sync_assessment_to_sheets(email, user, guest_raw, guest_scores)
+        sync_assessment_to_sheets(email, user, guest_raw, guest_scores, guest_submission_id)
 
     return True
 
@@ -982,12 +1171,71 @@ def index():
 
 @app.route('/demo/maps')
 def demo_maps():
+    if 'user' not in session or users.get(session['user'], {}).get('role') != 'admin':
+        return redirect(url_for('login'))
     assessments = get_demo_assessments()
+    local_emails = {str(item.get('email', '')).lower() for item in assessments}
+    for email, user in users.items():
+        if user.get('assessment_done') and email.lower() not in local_emails:
+            assessments.append(_assessment_from_sheet_row({
+                'email': email, 'ho_ten': user.get('name', email),
+                'dob': user.get('dob', ''), 'gioi_tinh': user.get('gender', ''),
+                'ton_giao': user.get('religion', ''), 'nghe_nghiep': user.get('occupation', ''),
+                'goals': user.get('goals', ''),
+                'timestamp': (user.get('score_history') or [{}])[-1].get('date', ''),
+                **{f'score_{key}': value for key, value in user.get('scores', {}).items()}
+            }))
     return render_template('demo_maps.html', assessments=assessments)
+
+
+def is_admin():
+    return 'user' in session and users.get(session['user'], {}).get('role') == 'admin'
+
+
+@app.route('/admin/users', methods=['GET', 'POST'])
+def admin_users():
+    if not is_admin():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        role = request.form.get('role', 'user')
+        if email in users and role in ('admin', 'user'):
+            users[email]['role'] = role
+            save_users(users)
+            flash(f"Đã cập nhật quyền {email} thành {role}.", 'success')
+        else:
+            flash('Không tìm thấy tài khoản hoặc quyền không hợp lệ.', 'error')
+        return redirect(url_for('admin_users'))
+    return render_template('admin_users.html', accounts=users)
+
+
+@app.route('/admin/maps')
+def admin_maps_history():
+    if not is_admin():
+        return redirect(url_for('login'))
+    with engine.begin() as conn:
+        records = conn.execute(text('''SELECT h.id, h.email, h.created_at, u.data
+            FROM map_history h LEFT JOIN users u ON u.email = h.email
+            ORDER BY h.id DESC''')).mappings().all()
+    return render_template('admin_maps_history.html', records=records)
+
+
+@app.route('/admin/maps/<int:record_id>')
+def admin_map_history_detail(record_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    with engine.begin() as conn:
+        record = conn.execute(text('SELECT * FROM map_history WHERE id = :id'), {'id': record_id}).mappings().first()
+    if not record:
+        return 'Không tìm thấy bản đồ.', 404
+    return render_template('admin_map_history_detail.html', record=record,
+                           raw=json.loads(record['raw_data']), scores=json.loads(record['scores']))
 
 
 @app.route('/demo/maps/<path:user_email>')
 def demo_map_detail(user_email):
+    if 'user' not in session or users.get(session['user'], {}).get('role') != 'admin':
+        return redirect(url_for('login'))
     assessment = next(
         (item for item in get_demo_assessments() if item.get('email') == user_email),
         None
@@ -1002,9 +1250,23 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        if email in users and users[email]['password'] == password:
+        stored_password = users.get(email, {}).get('password', '')
+        password_ok = False
+        if stored_password:
+            try:
+                password_ok = check_password_hash(stored_password, password)
+            except (ValueError, TypeError):
+                password_ok = stored_password == password
+        if email in users and password_ok:
+            if email == _admin_email and users[email].get('role') != 'admin':
+                users[email]['role'] = 'admin'
+                save_users(users)
+            if not stored_password.startswith(('scrypt:', 'pbkdf2:')):
+                users[email]['password'] = generate_password_hash(password)
+                save_users(users)
             session['user'] = email
             session['name'] = users[email]['name']
+            session['role'] = users[email].get('role', 'user')
             merged = merge_guest_into_user(email)
             if merged:
                 flash('Đã lưu Bản đồ của bạn vào tài khoản!', 'success')
@@ -1021,7 +1283,176 @@ def login():
                 session['claim_assessment'] = assessment
                 return redirect(url_for('claim_account'))
         flash('Email hoặc mật khẩu không đúng.', 'error')
-    return render_template('login.html')
+    return render_template('login.html', google_login_enabled=google_login_enabled)
+
+
+@app.route('/auth/google')
+def google_login():
+    if not google_login_enabled:
+        flash('Đăng nhập Google chưa được cấu hình.', 'error')
+        return redirect(url_for('login'))
+    callback_host = urlsplit(GOOGLE_REDIRECT_URI).hostname if GOOGLE_REDIRECT_URI else None
+    request_host = urlsplit(f'//{request.host}').hostname
+    if callback_host in {'localhost', '127.0.0.1', '::1'} and request_host not in {'localhost', '127.0.0.1', '::1'}:
+        flash('Để đăng nhập Google trên máy này, hãy mở http://localhost:5000 rồi thử lại. Không dùng IP LAN (192.168.x.x).', 'error')
+        return redirect(url_for('login'))
+    redirect_uri = GOOGLE_REDIRECT_URI or url_for('google_callback', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/auth/google/callback')
+def google_callback():
+    if not google_login_enabled:
+        return redirect(url_for('login'))
+    try:
+        token = oauth.google.authorize_access_token()
+        profile = token.get('userinfo') or {}
+    except Exception:
+        flash('Không thể xác thực tài khoản Google. Vui lòng thử lại.', 'error')
+        return redirect(url_for('login'))
+
+    email = str(profile.get('email') or '').strip().lower()
+    if not email or not profile.get('email_verified'):
+        flash('Google chưa xác nhận địa chỉ email này.', 'error')
+        return redirect(url_for('login'))
+
+    user = users.get(email)
+    if user is None:
+        user = {
+            'password': '',
+            'role': 'admin' if email == _admin_email else 'user',
+            'google_sub': profile.get('sub', ''),
+            'name': profile.get('name') or email,
+            'phone': '', 'dob': '', 'gender': '', 'religion': '',
+            'occupation': '', 'referrer': '',
+            'scores': {key: 0 for key in PILLAR_NAMES},
+            'score_history': [], 'assessment_raw': {},
+            'assessment_done': False, 'habit': None, 'checkins': [],
+            'want_coaching': None, 'goals': ''
+        }
+        users[email] = user
+    else:
+        user['google_sub'] = profile.get('sub', user.get('google_sub', ''))
+        if email == _admin_email:
+            user['role'] = 'admin'
+        if not user.get('name'):
+            user['name'] = profile.get('name') or email
+    save_users(users)
+
+    session['user'] = email
+    session['name'] = user.get('name', email)
+    session['role'] = user.get('role', 'user')
+    if merge_guest_into_user(email):
+        flash('Đăng nhập Google thành công, bản đồ đã lưu vào tài khoản.', 'success')
+        return redirect(url_for('map_result'))
+    flash('Đăng nhập Google thành công.', 'success')
+    if not user.get('assessment_done'):
+        return redirect(url_for('assessment'))
+    return redirect(url_for('home'))
+
+
+def _send_password_reset_email(email, reset_url):
+    server = os.environ.get('MAIL_SERVER', '').strip()
+    sender = os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME')
+    if not server or not sender:
+        return False
+    message = EmailMessage()
+    message['Subject'] = 'Đặt lại mật khẩu InsideOut HEALTH'
+    message['From'] = sender
+    message['To'] = email
+    message.set_content(
+        'Bạn vừa yêu cầu đặt lại mật khẩu InsideOut HEALTH. '
+        'Mở liên kết dưới đây trong vòng 30 phút để tạo mật khẩu mới:\n\n'
+        f'{reset_url}\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.'
+    )
+    port = int(os.environ.get('MAIL_PORT', '587'))
+    username = os.environ.get('MAIL_USERNAME', '')
+    password = os.environ.get('MAIL_PASSWORD', '')
+    if port == 465:
+        with smtplib.SMTP_SSL(server, port, timeout=15, context=ssl.create_default_context()) as smtp:
+            if username:
+                smtp.login(username, password)
+            smtp.send_message(message)
+    else:
+        with smtplib.SMTP(server, port, timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls(context=ssl.create_default_context())
+            smtp.ehlo()
+            if username:
+                smtp.login(username, password)
+            smtp.send_message(message)
+    return True
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        mail_configured = bool(os.environ.get('MAIL_SERVER') and
+                               (os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME')))
+        if not mail_configured:
+            flash('Chưa cấu hình gửi email SMTP. Hãy cấu hình MAIL_SERVER và MAIL_DEFAULT_SENDER trước.', 'error')
+            return render_template('forgot_password.html')
+        if email in users:
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+            now = datetime.now().astimezone()
+            with engine.begin() as conn:
+                conn.execute(text('DELETE FROM password_resets WHERE email = :email'), {'email': email})
+                conn.execute(text('''INSERT INTO password_resets (token_hash, email, expires_at)
+                    VALUES (:token_hash, :email, :expires_at)'''), {
+                    'token_hash': token_hash, 'email': email,
+                    'expires_at': (now + timedelta(minutes=30)).isoformat()
+                })
+            reset_url = url_for('reset_password', token=raw_token, _external=True)
+            try:
+                _send_password_reset_email(email, reset_url)
+            except Exception:
+                app.logger.exception('Could not send password reset email')
+                with engine.begin() as conn:
+                    conn.execute(text('DELETE FROM password_resets WHERE token_hash = :token_hash'),
+                                 {'token_hash': token_hash})
+        flash('Nếu email này có tài khoản, hướng dẫn đặt lại mật khẩu sẽ được gửi đến hộp thư.', 'info')
+        return redirect(url_for('forgot_password'))
+    return render_template('forgot_password.html')
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+    with engine.begin() as conn:
+        reset = conn.execute(text('''SELECT email, expires_at, used_at FROM password_resets
+            WHERE token_hash = :token_hash'''), {'token_hash': token_hash}).mappings().first()
+    now = datetime.now().astimezone()
+    valid = bool(reset and not reset['used_at'] and
+                 datetime.fromisoformat(reset['expires_at']) > now)
+    if not valid:
+        flash('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.', 'error')
+        return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirmation = request.form.get('password_confirmation', '')
+        if len(password) < 8:
+            flash('Mật khẩu cần có ít nhất 8 ký tự.', 'error')
+        elif password != confirmation:
+            flash('Hai lần nhập mật khẩu chưa giống nhau.', 'error')
+        else:
+            user = users.get(reset['email'])
+            if not user:
+                flash('Không tìm thấy tài khoản.', 'error')
+                return redirect(url_for('forgot_password'))
+            user['password'] = generate_password_hash(password)
+            save_users(users)
+            with engine.begin() as conn:
+                conn.execute(text('UPDATE password_resets SET used_at = :used_at WHERE token_hash = :token_hash'), {
+                    'used_at': now.isoformat(), 'token_hash': token_hash
+                })
+            flash('Đã đổi mật khẩu. Bạn có thể đăng nhập ngay.', 'success')
+            return redirect(url_for('login'))
+    response = app.make_response(render_template('reset_password.html'))
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.route('/claim-account', methods=['GET', 'POST'])
@@ -1043,6 +1474,7 @@ def claim_account():
             session.pop('claim_assessment', None)
             session['user'] = email
             session['name'] = users[email]['name']
+            session['role'] = users[email].get('role', 'user')
             flash('Đã khôi phục Bản đồ. Từ lần sau bạn chỉ cần đăng nhập bằng Gmail và mật khẩu.', 'success')
             return redirect(url_for('map_result'))
     return render_template('claim_account.html', email=email, assessment=assessment)
@@ -1060,7 +1492,8 @@ def register():
             flash('Email này đã được sử dụng.', 'error')
         else:
             users[email] = {
-                'password': password,
+                'password': generate_password_hash(password),
+                'role': 'admin' if email == _admin_email else 'user',
                 'name': name,
                 'phone': '',
                 'dob': '',
@@ -1080,6 +1513,7 @@ def register():
             save_users(users)
             session['user'] = email
             session['name'] = name
+            session['role'] = users[email].get('role', 'user')
             merged = merge_guest_into_user(email)
             if merged:
                 flash('Đăng ký thành công! Bản đồ của bạn đã được lưu.', 'success')
@@ -1087,7 +1521,7 @@ def register():
             flash('Đăng ký thành công! Bắt đầu vẽ Bản đồ Tâm – Thể của bạn.', 'success')
             return redirect(url_for('assessment'))
     pending = session.get('guest_assessment_raw') or {}
-    return render_template('register.html', pending=pending)
+    return render_template('register.html', pending=pending, google_login_enabled=google_login_enabled)
 
 
 @app.route('/logout')
@@ -1119,6 +1553,10 @@ def home():
 def assessment():
     """Cho phép vẽ bản đồ TRƯỚC khi đăng nhập (guest)."""
     if request.method == 'POST':
+        submission_id = request.form.get('submission_id', '').strip()
+        if (not 16 <= len(submission_id) <= 128 or
+                not all(char.isalnum() or char in '_-' for char in submission_id)):
+            submission_id = session.get('assessment_submission_id') or secrets.token_urlsafe(24)
         raw = {}
         for section in ASSESSMENT_SECTIONS:
             for q in section['questions']:
@@ -1138,7 +1576,8 @@ def assessment():
                 sections=ASSESSMENT_SECTIONS,
                 pillar_names=PILLAR_NAMES,
                 name=raw.get('name') or 'Bạn',
-                is_guest=('user' not in session)
+                is_guest=('user' not in session),
+                submission_id=submission_id
             )
 
         scores = compute_scores(raw)
@@ -1165,7 +1604,13 @@ def assessment():
             user['score_history'] = history[-12:]
             user['assessment_done'] = True
             save_users(users)
-            ok, msg = sync_assessment_to_sheets(session['user'], user, raw, scores)
+            with engine.begin() as conn:
+                conn.execute(text('INSERT INTO map_history (email, created_at, raw_data, scores) VALUES (:email, :created_at, :raw_data, :scores)'), {
+                    'email': session['user'], 'created_at': datetime.now().isoformat(timespec='seconds'),
+                    'raw_data': json.dumps(raw, ensure_ascii=False),
+                    'scores': json.dumps(scores, ensure_ascii=False)
+                })
+            ok, msg = sync_assessment_to_sheets(session['user'], user, raw, scores, submission_id)
             if ok:
                 flash('Bản đồ Tâm – Thể đã sẵn sàng! Dữ liệu đã đồng bộ.', 'success')
             else:
@@ -1174,12 +1619,14 @@ def assessment():
             # Guest: lưu tạm trong session, chưa cần tài khoản
             session['guest_scores'] = scores
             session['guest_assessment_raw'] = raw
+            session['guest_assessment_submission_id'] = submission_id
             session['guest_name'] = raw.get('name') or session.get('guest_name') or 'Bạn'
             ok, msg = sync_assessment_to_sheets(
                 '',
                 {'name': raw.get('name', '')},
                 raw,
-                scores
+                scores,
+                submission_id
             )
             session['guest_assessment_synced'] = ok
             if ok:
@@ -1196,12 +1643,16 @@ def assessment():
         session.pop('guest_scores', None)
         session.pop('guest_assessment_raw', None)
         session.pop('guest_assessment_synced', None)
+        session.pop('guest_assessment_submission_id', None)
+    submission_id = secrets.token_urlsafe(24)
+    session['assessment_submission_id'] = submission_id
     display_name = session.get('name') if 'user' in session else 'Bạn'
     return render_template('assessment.html',
                            sections=ASSESSMENT_SECTIONS,
                            pillar_names=PILLAR_NAMES,
                            name=display_name,
-                           is_guest=('user' not in session))
+                           is_guest=('user' not in session),
+                           submission_id=submission_id)
 
 
 @app.route('/map')
@@ -1273,14 +1724,36 @@ def checkin():
         return redir
     user = users[session['user']]
     if request.method == 'POST':
-        mood = request.form.get('mood', '3')
+        mood = request.form.get('mood', '3').strip()
         note = request.form.get('note', '').strip()
         habit_done = request.form.get('habit_done') == 'yes'
+        try:
+            mood_value = int(mood)
+            sleep_hours = float(request.form.get('sleep_hours', ''))
+            water_glasses = int(request.form.get('water_glasses', ''))
+            activity_minutes = int(request.form.get('activity_minutes', ''))
+        except (TypeError, ValueError):
+            mood_value = 0
+            sleep_hours = -1
+            water_glasses = -1
+            activity_minutes = -1
+        if (not 1 <= mood_value <= 5 or not 0 <= sleep_hours <= 24 or
+                not 0 <= water_glasses <= 30 or not 0 <= activity_minutes <= 600):
+            flash('Vui lòng nhập đúng các chỉ số sức khỏe trong giới hạn cho phép.', 'error')
+            return render_template('checkin.html',
+                                   name=session.get('name', 'Bạn'),
+                                   habit=user.get('habit'),
+                                   pillar_names=PILLAR_NAMES,
+                                   pillar_icons=PILLAR_ICONS,
+                                   form_values=request.form)
         checkin_data = {
             'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'mood': int(mood),
+            'mood': mood_value,
             'note': note,
-            'habit_done': habit_done
+            'habit_done': habit_done,
+            'sleep_hours': sleep_hours,
+            'water_glasses': water_glasses,
+            'activity_minutes': activity_minutes
         }
         user.setdefault('checkins', []).append(checkin_data)
         if habit_done and user.get('habit'):
@@ -1294,6 +1767,9 @@ def checkin():
             'habit_done': 'yes' if habit_done else 'no',
             'habit_title': (user.get('habit') or {}).get('title', ''),
             'note': note,
+            'sleep_hours': sleep_hours,
+            'water_glasses': water_glasses,
+            'activity_minutes': activity_minutes,
             'scores': user['scores']
         })
         if ok:
@@ -1305,7 +1781,8 @@ def checkin():
                            name=session.get('name', 'Bạn'),
                            habit=user.get('habit'),
                            pillar_names=PILLAR_NAMES,
-                           pillar_icons=PILLAR_ICONS)
+                           pillar_icons=PILLAR_ICONS,
+                           form_values={})
 
 
 @app.route('/trends')
@@ -1321,6 +1798,44 @@ def trends():
         day = c['date'][:10]
         mood_by_day.setdefault(day, []).append(c['mood'])
     mood_avg = {d: round(sum(v) / len(v), 1) for d, v in sorted(mood_by_day.items())}
+    wellness_fields = {
+        'sleep_hours': ('Giấc ngủ', 'giờ/đêm'),
+        'water_glasses': ('Nước', 'ly/ngày'),
+        'activity_minutes': ('Vận động', 'phút/ngày'),
+        'mood': ('Tâm trạng', 'điểm/5')
+    }
+    today = datetime.now().date()
+    recent_start = today - timedelta(days=6)
+    previous_start = today - timedelta(days=13)
+    recent_values = {key: [] for key in wellness_fields}
+    previous_values = {key: [] for key in wellness_fields}
+    for checkin_entry in checkins:
+        try:
+            checkin_day = datetime.strptime(str(checkin_entry.get('date', ''))[:10], '%Y-%m-%d').date()
+        except ValueError:
+            continue
+        period_values = (recent_values if recent_start <= checkin_day <= today else
+                         previous_values if previous_start <= checkin_day < recent_start else None)
+        if period_values is not None:
+            for key in wellness_fields:
+                try:
+                    period_values[key].append(float(checkin_entry[key]))
+                except (KeyError, TypeError, ValueError):
+                    pass
+    wellness_summary = {
+        key: {
+            'label': label,
+            'unit': unit,
+            'average': round(sum(values) / len(values), 1),
+            'count': len(values),
+            'previous_average': round(sum(previous_values[key]) / len(previous_values[key]), 1)
+                                if previous_values[key] else None,
+            'change': round(sum(values) / len(values) - sum(previous_values[key]) / len(previous_values[key]), 1)
+                      if previous_values[key] else None
+        }
+        for key, (label, unit) in wellness_fields.items()
+        if (values := recent_values[key])
+    }
     return render_template('trends.html',
                            name=session.get('name', 'Bạn'),
                            history=history,
@@ -1328,7 +1843,8 @@ def trends():
                            scores=user['scores'],
                            pillar_names=PILLAR_NAMES,
                            pillar_icons=PILLAR_ICONS,
-                           checkin_count=len(checkins))
+                           checkin_count=len(checkins),
+                           wellness_summary=wellness_summary)
 
 
 @app.route('/info')

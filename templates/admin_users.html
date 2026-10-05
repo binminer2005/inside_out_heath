@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Quản trị tài khoản{% endblock %}
+{% block content %}
+<h1 class="page-title">Quản trị tài khoản</h1>
+<p class="page-subtitle">Cấp quyền admin để xem lịch sử bản đồ.</p>
+<div class="card"><a class="btn btn-primary" href="{{ url_for('admin_maps_history') }}">Lịch sử các lần vẽ bản đồ</a> <a class="btn btn-ghost" href="{{ url_for('demo_maps') }}">Danh sách bản đồ mới nhất</a></div>
+{% for email, account in accounts.items()|sort %}
+<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-top:0.75rem">
+  <div><strong>{{ account.name or email }}</strong><br><span>{{ email }} · {{ account.get('role', 'user') }}</span></div>
+  <form method="post" style="display:flex;gap:.5rem;align-items:center">
+    <input type="hidden" name="email" value="{{ email }}">
+    <select name="role" aria-label="Quyền của {{ email }}"><option value="user" {% if account.get('role') != 'admin' %}selected{% endif %}>user</option><option value="admin" {% if account.get('role') == 'admin' %}selected{% endif %}>admin</option></select>
+    <button class="btn btn-primary" type="submit">Lưu quyền</button>
+  </form>
+</div>
+{% else %}<div class="card">Chưa có tài khoản.</div>{% endfor %}
+{% endblock %}

@@ -12,25 +12,44 @@
     <div class="card-title">Hôm nay bạn cảm thấy thế nào?</div>
     <div class="mood-scale">
       <label>
-        <input type="radio" name="mood" value="1">
+        <input type="radio" name="mood" value="1" {% if form_values.get('mood') == '1' %}checked{% endif %}>
         <div class="mood-face">😔<span>Rất thấp</span></div>
       </label>
       <label>
-        <input type="radio" name="mood" value="2">
+        <input type="radio" name="mood" value="2" {% if form_values.get('mood') == '2' %}checked{% endif %}>
         <div class="mood-face">😕<span>Thấp</span></div>
       </label>
       <label>
-        <input type="radio" name="mood" value="3" checked>
+        <input type="radio" name="mood" value="3" {% if form_values.get('mood', '3') == '3' %}checked{% endif %}>
         <div class="mood-face">😐<span>Ổn</span></div>
       </label>
       <label>
-        <input type="radio" name="mood" value="4">
+        <input type="radio" name="mood" value="4" {% if form_values.get('mood') == '4' %}checked{% endif %}>
         <div class="mood-face">🙂<span>Tốt</span></div>
       </label>
       <label>
-        <input type="radio" name="mood" value="5">
+        <input type="radio" name="mood" value="5" {% if form_values.get('mood') == '5' %}checked{% endif %}>
         <div class="mood-face">😊<span>Rất tốt</span></div>
       </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Chăm sóc cơ thể hôm nay</div>
+    <div class="form-group">
+      <label for="sleep_hours">Bạn đã ngủ bao nhiêu giờ?</label>
+      <input id="sleep_hours" name="sleep_hours" type="number" min="0" max="24" step="0.5" required
+             value="{{ form_values.get('sleep_hours', '') }}" placeholder="Ví dụ: 7.5">
+    </div>
+    <div class="form-group">
+      <label for="water_glasses">Hôm nay bạn uống khoảng bao nhiêu ly nước?</label>
+      <input id="water_glasses" name="water_glasses" type="number" min="0" max="30" step="1" required
+             value="{{ form_values.get('water_glasses', '') }}" placeholder="Ví dụ: 6">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="activity_minutes">Bạn vận động bao nhiêu phút?</label>
+      <input id="activity_minutes" name="activity_minutes" type="number" min="0" max="600" step="1" required
+             value="{{ form_values.get('activity_minutes', '') }}" placeholder="Ví dụ: 20">
     </div>
   </div>
 

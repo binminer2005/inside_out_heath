@@ -227,6 +227,7 @@
   </div>
 
   <form method="POST" id="assessForm" novalidate>
+    <input type="hidden" name="submission_id" value="{{ submission_id }}">
     <div class="assess-panel">
       {% for section in sections %}
       <div class="assess-step {% if loop.first %}active{% endif %}"

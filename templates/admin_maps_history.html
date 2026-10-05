@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử bản đồ{% endblock %}
+{% block content %}
+<a href="{{ url_for('admin_users') }}">← Quản trị tài khoản</a>
+<h1 class="page-title">Lịch sử các lần vẽ bản đồ</h1>
+<p class="page-subtitle">Mỗi lần người dùng đã đăng nhập gửi bản đồ sẽ được lưu tại đây.</p>
+{% for item in records %}
+<a class="demo-person" href="{{ url_for('admin_map_history_detail', record_id=item.id) }}"><div class="demo-person-main"><strong>{{ item.email }}</strong><span>{{ item.created_at }}</span></div><span class="demo-arrow">→</span></a>
+{% else %}<div class="card demo-empty">Chưa có lịch sử bản đồ được lưu.</div>{% endfor %}
+{% endblock %}

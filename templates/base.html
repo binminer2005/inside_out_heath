@@ -23,6 +23,7 @@
         <a href="{{ url_for('checkin') }}">Check-in</a>
         <a href="{{ url_for('map_result') }}">Bản đồ</a>
         <a href="{{ url_for('trends') }}">Xu hướng</a>
+        {% if session.get('user') and session.get('role') == 'admin' %}<a href="{{ url_for('admin_users') }}">Quản trị</a>{% endif %}
         <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">Đăng xuất</a>
       {% else %}
         <a href="{{ url_for('assessment') }}">Vẽ bản đồ</a>

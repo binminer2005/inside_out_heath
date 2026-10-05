@@ -64,6 +64,35 @@
 </div>
 {% endif %}
 
+<div class="card">
+  <div class="card-title">Theo dõi sức khỏe · 7 ngày gần đây</div>
+  <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1rem;">Chỉ số trung bình được so với 7 ngày liền trước, dựa trên những lần bạn đã check-in.</p>
+  {% if wellness_summary %}
+  <div class="score-grid">
+    {% for item in wellness_summary.values() %}
+    <div class="score-item">
+      <div class="name">{{ item.label }}</div>
+      <div class="value">{{ item.average }}</div>
+      <div class="name">{{ item.unit }} · {{ item.count }} lần ghi nhận</div>
+      {% if item.previous_average is not none %}
+      <div class="name" style="margin-top:.35rem;">
+        {% if item.change > 0 %}↑ {{ item.change }}{% elif item.change < 0 %}↓ {{ item.change|abs }}{% else %}Không đổi{% endif %}
+        so với tuần trước ({{ item.previous_average }})
+      </div>
+      {% else %}
+      <div class="name" style="margin-top:.35rem;">Chưa có dữ liệu tuần trước để so sánh</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p style="font-size:0.88rem;color:var(--text-muted);">
+    Chưa có dữ liệu. Ghi nhận giấc ngủ, nước uống và vận động trong check-in hằng ngày để theo dõi.
+  </p>
+  {% endif %}
+  <a href="{{ url_for('checkin') }}" class="btn btn-outline btn-sm mt-1">Check-in hôm nay</a>
+</div>
+
 <div class="card card-soft">
   <div class="card-title">✅ Check-in đã ghi</div>
   <p style="font-size:1.4rem;font-weight:800;color:var(--forest);">{{ checkin_count }}</p>

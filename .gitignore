@@ -1,6 +1,9 @@
 credentials.json
 data/credentials.json
 data/users.json
+data/*.db
+client_secret*.json
+oauth-client*.json
 __pycache__/
 *.py[cod]
 .venv/

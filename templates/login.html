@@ -8,6 +8,17 @@
     <h1>Chào mừng trở lại</h1>
     <p class="subtitle">Tiếp tục hành trình cân bằng của bạn</p>
 
+    <a href="{{ url_for('google_login') }}" class="btn btn-ghost btn-block" style="margin:0 0 1rem;border:1px solid #d5ddd8;display:flex;justify-content:center;align-items:center;gap:.65rem">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" focusable="false">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.91 3.28-4.73 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.15v2.84A11 11 0 0 0 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.15a11 11 0 0 0 0 9.88l3.69-2.84z"/>
+        <path fill="#EA4335" d="M12 4.36c1.62 0 3.08.56 4.22 1.66l3.16-3.16C17.45 1.09 14.97 0 12 0A11 11 0 0 0 2.15 7.06L5.84 9.9C6.71 7.3 9.14 5.36 12 5.36z" transform="translate(0 0.8)"/>
+      </svg>
+      Đăng nhập bằng Google
+    </a>
+    <div style="display:flex;align-items:center;gap:.75rem;margin:0 0 1rem;color:#718078"><hr style="flex:1">hoặc<hr style="flex:1"></div>
+
     <form method="POST">
       <div class="form-group">
         <label for="email">Email</label>
@@ -19,6 +30,8 @@
       </div>
       <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
     </form>
+
+    <p class="auth-footer" style="margin-top:.75rem"><a href="{{ url_for('forgot_password') }}">Quên mật khẩu?</a></p>
 
     <p class="auth-footer">
       Chưa có tài khoản? <a href="{{ url_for('register') }}">Đăng ký miễn phí</a>

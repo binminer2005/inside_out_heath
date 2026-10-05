@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Bản đồ {{ record.email }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('admin_maps_history') }}">← Lịch sử bản đồ</a>
+<h1 class="page-title">{{ raw.get('name') or record.email }}</h1>
+<p class="page-subtitle">{{ record.email }} · {{ record.created_at }}</p>
+<div class="card"><div class="card-title">Điểm sáu trụ cột</div><div class="demo-score-grid">
+{% for key, label in [('giac_ngu', 'Giấc ngủ'), ('dinh_duong', 'Dinh dưỡng'), ('van_dong', 'Vận động'), ('nhip_sinh_hoc', 'Nhịp sinh học'), ('cam_xuc', 'Cảm xúc'), ('tinh_than', 'Tinh thần')] %}
+<div class="demo-score"><span>{{ label }}</span><strong>{{ scores.get(key, '—') }}</strong></div>
+{% endfor %}</div></div>
+<div class="card"><div class="card-title">Thông tin trả lời</div><dl>{% for key, value in raw.items() %}<dt>{{ key }}</dt><dd>{{ value or '—' }}</dd>{% endfor %}</dl></div>
+{% endblock %}
