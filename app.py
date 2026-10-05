@@ -220,17 +220,26 @@ CHECKIN_SHEET_HEADERS = [
 def _get_gspread_client():
     import gspread
     from google.oauth2.service_account import Credentials
+    credentials_json = os.environ.get('GOOGLE_CREDENTIALS_JSON', '').strip()
     creds_path = os.environ.get('GOOGLE_CREDENTIALS_PATH')
+    scopes = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    if credentials_json:
+        try:
+            credentials_info = json.loads(credentials_json)
+        except json.JSONDecodeError as error:
+            raise ValueError('GOOGLE_CREDENTIALS_JSON không phải JSON hợp lệ.') from error
+        creds = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+        return gspread.authorize(creds)
+
     if not creds_path:
         data_credentials = os.path.join(DATA_DIR, 'credentials.json')
         root_credentials = os.path.join(os.path.dirname(__file__), 'credentials.json')
         creds_path = data_credentials if os.path.exists(data_credentials) else root_credentials
     if not os.path.exists(creds_path):
         raise FileNotFoundError(f'Không tìm thấy credentials: {creds_path}')
-    scopes = [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive'
-    ]
     creds = Credentials.from_service_account_file(creds_path, scopes=scopes)
     return gspread.authorize(creds)
 
@@ -1862,7 +1871,8 @@ def sync_status():
     configured = bool(SPREADSHEET_ID)
     has_creds = (
         os.path.exists(os.path.join(DATA_DIR, 'credentials.json')) or
-        bool(os.environ.get('GOOGLE_CREDENTIALS_PATH'))
+        bool(os.environ.get('GOOGLE_CREDENTIALS_PATH')) or
+        bool(os.environ.get('GOOGLE_CREDENTIALS_JSON'))
     )
     return jsonify({
         'configured': configured,
