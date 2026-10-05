@@ -1237,8 +1237,29 @@ def admin_map_history_detail(record_id):
         record = conn.execute(text('SELECT * FROM map_history WHERE id = :id'), {'id': record_id}).mappings().first()
     if not record:
         return 'Không tìm thấy bản đồ.', 404
+    raw = json.loads(record['raw_data'])
+    scores = json.loads(record['scores'])
+    answer_sections = []
+    for section in ASSESSMENT_SECTIONS:
+        if section['id'] == 'profile':
+            continue
+        questions = []
+        for question in section['questions']:
+            answer = raw.get(question['id'])
+            if answer is None or answer == '':
+                continue
+            display_answer = answer
+            for option in question.get('options', []):
+                if str(option.get('value')) == str(answer):
+                    display_answer = option.get('label', answer)
+                    break
+            questions.append({**question, 'answer_display': display_answer})
+        if questions:
+            answer_sections.append({**section, 'questions': questions})
     return render_template('admin_map_history_detail.html', record=record,
-                           raw=json.loads(record['raw_data']), scores=json.loads(record['scores']))
+                           raw=raw, scores=scores, answer_sections=answer_sections,
+                           pillar_names=PILLAR_NAMES, pillar_icons=PILLAR_ICONS,
+                           score_values=[scores.get(key, 0) for key in PILLAR_NAMES])
 
 
 @app.route('/demo/maps/<path:user_email>')

@@ -1,12 +1,136 @@
 {% extends "base.html" %}
-{% block title %}Bản đồ {{ record.email }}{% endblock %}
+{% block title %}Bản đồ {{ raw.get('name') or record.email }}{% endblock %}
+{% block main_class %}container admin-detail-container{% endblock %}
 {% block content %}
-<a href="{{ url_for('admin_maps_history') }}">← Lịch sử bản đồ</a>
-<h1 class="page-title">{{ raw.get('name') or record.email }}</h1>
-<p class="page-subtitle">{{ record.email }} · {{ record.created_at }}</p>
-<div class="card"><div class="card-title">Điểm sáu trụ cột</div><div class="demo-score-grid">
-{% for key, label in [('giac_ngu', 'Giấc ngủ'), ('dinh_duong', 'Dinh dưỡng'), ('van_dong', 'Vận động'), ('nhip_sinh_hoc', 'Nhịp sinh học'), ('cam_xuc', 'Cảm xúc'), ('tinh_than', 'Tinh thần')] %}
-<div class="demo-score"><span>{{ label }}</span><strong>{{ scores.get(key, '—') }}</strong></div>
-{% endfor %}</div></div>
-<div class="card"><div class="card-title">Thông tin trả lời</div><dl>{% for key, value in raw.items() %}<dt>{{ key }}</dt><dd>{{ value or '—' }}</dd>{% endfor %}</dl></div>
+<style>
+  .admin-detail-container { max-width: 1120px; }
+  .admin-detail-back { display: inline-block; margin-bottom: 1rem; color: var(--forest); font-weight: 800; }
+  .admin-detail-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.2rem; }
+  .admin-detail-head .page-title { margin:0 0 .3rem; }
+  .admin-detail-date { color:var(--text-muted); font-size:.88rem; }
+  .admin-detail-layout { display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(280px, .85fr); gap:1rem; align-items:stretch; }
+  .admin-detail-container .card { min-width:0; }
+  .admin-radar-wrap { width:min(100%, 520px); margin:0 auto; }
+  .admin-radar-wrap canvas { display:block; width:100%; }
+  .admin-score-list { display:grid; gap:.95rem; }
+  .admin-score-row { display:grid; grid-template-columns:minmax(115px, .8fr) minmax(80px, 1fr) 2.2rem; gap:.65rem; align-items:center; }
+  .admin-score-label { display:flex; align-items:center; gap:.45rem; font-weight:700; font-size:.9rem; }
+  .admin-score-track { height:10px; overflow:hidden; border-radius:99px; background:var(--bg); }
+  .admin-score-fill { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--sage), var(--forest)); }
+  .admin-score-value { color:var(--forest); text-align:right; font-size:1rem; font-weight:800; }
+  .admin-profile { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.7rem; margin-top:1rem; }
+  .admin-profile-item { min-width:0; padding:.75rem; border-radius:12px; background:var(--bg); }
+  .admin-profile-item span { display:block; margin-bottom:.2rem; color:var(--text-muted); font-size:.75rem; }
+  .admin-profile-item strong { display:block; overflow-wrap:anywhere; font-size:.9rem; }
+  .admin-answer-heading { margin:1.6rem 0 .8rem; }
+  .admin-answer-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:1rem; }
+  .admin-answer-card { margin:0; }
+  .admin-section-title { margin-bottom:.85rem; }
+  .admin-section-title .icon { margin-right:.35rem; }
+  .admin-answer-row { padding:.8rem 0; border-top:1px solid var(--border); }
+  .admin-answer-question { color:var(--text-muted); font-size:.83rem; line-height:1.45; }
+  .admin-answer-value { margin-top:.2rem; font-weight:800; overflow-wrap:anywhere; }
+  @media (max-width:700px) {
+    .admin-detail-container { width:100%; }
+    .admin-detail-layout, .admin-answer-grid { grid-template-columns:1fr; }
+    .admin-detail-head { display:block; }
+    .admin-profile { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .admin-score-row { grid-template-columns:minmax(110px, .9fr) minmax(55px, 1fr) 2rem; gap:.45rem; }
+    .admin-score-label { font-size:.82rem; }
+  }
+</style>
+
+<a class="admin-detail-back" href="{{ url_for('admin_maps_history') }}">← Lịch sử bản đồ</a>
+<header class="admin-detail-head">
+  <div>
+    <div class="eyebrow">Hồ sơ đánh giá</div>
+    <h1 class="page-title">{{ raw.get('name') or record.email }}</h1>
+    <p class="admin-detail-date">{{ record.email }} · {{ record.created_at }}</p>
+  </div>
+</header>
+
+<div class="admin-detail-layout">
+  <section class="card">
+    <div class="card-title">🕸️ Bản đồ sáu trụ cột</div>
+    <p class="demo-muted">Điểm tự đánh giá theo thang từ 0 đến 5.</p>
+    <div class="admin-radar-wrap"><canvas id="adminRadar" aria-label="Biểu đồ radar sáu trụ cột"></canvas></div>
+  </section>
+  <section class="card">
+    <div class="card-title">📊 Điểm từng trụ cột</div>
+    <div class="admin-score-list">
+      {% for key, label in pillar_names.items() %}
+      {% set value = scores.get(key, 0)|float %}
+      <div class="admin-score-row">
+        <div class="admin-score-label"><span>{{ pillar_icons[key] }}</span><span>{{ label }}</span></div>
+        <div class="admin-score-track" aria-label="{{ label }}: {{ value }} trên 5"><span class="admin-score-fill" style="width:{{ ([value, 5]|min / 5 * 100)|round }}%"></span></div>
+        <div class="admin-score-value">{{ value|round(1) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-title">👤 Thông tin người tham gia</div>
+  <div class="admin-profile">
+    {% for key, label in [('dob', 'Ngày sinh'), ('gender', 'Giới tính'), ('phone', 'Số điện thoại'), ('email', 'Email'), ('occupation', 'Nghề nghiệp'), ('religion', 'Tôn giáo'), ('referrer', 'Người giới thiệu')] %}
+    {% if raw.get(key) %}<div class="admin-profile-item"><span>{{ label }}</span><strong>{{ raw.get(key) }}</strong></div>{% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+{% if answer_sections %}
+<h2 class="admin-answer-heading">Câu trả lời theo từng mục</h2>
+<div class="admin-answer-grid">
+  {% for section in answer_sections %}
+  <section class="card admin-answer-card">
+    <div class="card-title admin-section-title"><span class="icon">{{ section.icon }}</span>{{ section.title }}</div>
+    {% for question in section.questions %}
+    <div class="admin-answer-row">
+      <div class="admin-answer-question">{{ question.label }}</div>
+      <div class="admin-answer-value">{{ question.answer_display }}</div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const adminRadar = document.getElementById('adminRadar');
+  if (adminRadar) {
+    new Chart(adminRadar, {
+      type: 'radar',
+      data: {
+        labels: {{ pillar_names.values()|list|tojson }},
+        datasets: [{
+          label: 'Điểm (0–5)',
+          data: {{ score_values|tojson }},
+          backgroundColor: 'rgba(49, 92, 80, 0.18)',
+          borderColor: '#315C50',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#315C50',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: { r: {
+          min: 0, max: 5,
+          ticks: { stepSize: 1, backdropColor: 'transparent', color: '#8A9B97' },
+          grid: { color: 'rgba(49, 92, 80, 0.1)' },
+          angleLines: { color: 'rgba(49, 92, 80, 0.1)' },
+          pointLabels: { color: '#2C3E3A', font: { family: 'Nunito', size: 11, weight: '600' } }
+        }},
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+</script>
 {% endblock %}
