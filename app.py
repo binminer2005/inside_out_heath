@@ -653,20 +653,6 @@ ASSESSMENT_SECTIONS = [
                 ]
             },
             {
-                'id': 'religion',
-                'type': 'choice',
-                'label': 'Tôn giáo',
-                'required': True,
-                'options': [
-                    {'value': 'Không có', 'label': 'Không có'},
-                    {'value': 'Phật giáo', 'label': 'Phật giáo'},
-                    {'value': 'Công giáo', 'label': 'Công giáo'},
-                    {'value': 'Tin lành', 'label': 'Tin lành'},
-                    {'value': 'Cao đài', 'label': 'Cao đài'},
-                    {'value': 'Khác', 'label': 'Khác'}
-                ]
-            },
-            {
                 'id': 'phone',
                 'type': 'text',
                 'input_type': 'tel',
@@ -1097,6 +1083,37 @@ def score_band(score: float) -> str:
     return 'Tốt'
 
 
+
+def _normalize_habits(user):
+    """Migrate legacy single habit to list and always return a list."""
+    habits = user.get('habits')
+    if habits is None:
+        legacy = user.get('habit')
+        if legacy:
+            habits = [legacy]
+        else:
+            habits = []
+        user['habits'] = habits
+    return habits
+
+
+def detect_red_flags(scores):
+    """Return True if emotion or spirit scores indicate need for extra care."""
+    if not scores:
+        return False
+    emo = float(scores.get('cam_xuc') or 0)
+    spirit = float(scores.get('tinh_than') or 0)
+    return emo <= 2.0 or spirit <= 2.0
+
+
+def get_lowest_pillars(scores, n=3):
+    """Return up to n pillar keys sorted by ascending score."""
+    items = [(k, float(v or 0)) for k, v in scores.items() if k in PILLAR_NAMES]
+    items.sort(key=lambda x: x[1])
+    return [k for k, _ in items[:n]]
+
+
+
 def require_login():
     if 'user' not in session:
         return redirect(url_for('login'))
@@ -1126,6 +1143,7 @@ def merge_guest_into_user(email):
     guest_synced = session.pop('guest_assessment_synced', False)
     guest_submission_id = session.pop('guest_assessment_submission_id', None)
     guest_habit = session.pop('guest_habit', None)
+    guest_habits = session.pop('guest_habits', None)
     if not guest_scores and not guest_raw:
         return False
     user = users.get(email)
@@ -1152,8 +1170,12 @@ def merge_guest_into_user(email):
                 'raw_data': json.dumps(guest_raw or {}, ensure_ascii=False),
                 'scores': json.dumps(guest_scores, ensure_ascii=False)
             })
-    if guest_habit:
+    if guest_habits:
+        user['habits'] = guest_habits
+        user['habit'] = guest_habits[0]
+    elif guest_habit:
         user['habit'] = guest_habit
+        user['habits'] = [guest_habit]
     save_users(users)
 
     # Sync an assessment completed before registration after the user has an email.
@@ -1569,14 +1591,17 @@ def home():
     user = users[session['user']]
     scores = user['scores']
     has_map = any(v > 0 for v in scores.values())
+    habits = _normalize_habits(user)
     return render_template('home.html',
                            name=session.get('name', 'Bạn'),
                            scores=scores,
                            pillar_names=PILLAR_NAMES,
                            pillar_icons=PILLAR_ICONS,
-                           habit=user.get('habit'),
+                           habit=habits[0] if habits else None,
+                           habits=habits,
                            has_map=has_map,
-                           checkin_count=len(user.get('checkins', [])))
+                           checkin_count=len(user.get('checkins', [])),
+                           red_flags=detect_red_flags(scores))
 
 
 @app.route('/assessment', methods=['GET', 'POST'])
@@ -1713,45 +1738,70 @@ def map_result():
             return redirect(url_for('assessment'))
         name = session.get('name', 'Bạn')
 
-    lowest = min(scores, key=scores.get)
+    lowest_keys = get_lowest_pillars(scores, n=3)
+    suggested_habits = {k: TINY_HABITS.get(k, []) for k in lowest_keys}
+    red_flags = detect_red_flags(scores)
     return render_template('map.html',
                            name=name,
                            scores=scores,
                            pillar_names=PILLAR_NAMES,
                            pillar_icons=PILLAR_ICONS,
-                           lowest=lowest,
-                           habits=TINY_HABITS.get(lowest, []),
+                           lowest=lowest_keys[0] if lowest_keys else None,
+                           suggested_habits=suggested_habits,
+                           red_flags=red_flags,
                            is_guest=is_guest)
 
 
 @app.route('/choose-habit', methods=['POST'])
 def choose_habit():
-    habit_id = request.form.get('habit_id')
-    pillar = request.form.get('pillar')
-    chosen = None
-    if pillar and habit_id:
+    # Accept multiple: habit_ids = ["pillar::id", ...]
+    raw_ids = request.form.getlist('habit_ids')
+    chosen_list = []
+    for token in raw_ids[:3]:
+        if '::' not in token:
+            continue
+        pillar, hid = token.split('::', 1)
         for h in TINY_HABITS.get(pillar, []):
-            if h['id'] == habit_id:
-                chosen = {
+            if h['id'] == hid:
+                chosen_list.append({
                     **h,
                     'pillar': pillar,
                     'started': datetime.now().strftime('%Y-%m-%d')
-                }
+                })
                 break
 
+    # Backward compat: single radio
+    if not chosen_list:
+        habit_id = request.form.get('habit_id')
+        pillar = request.form.get('pillar')
+        if pillar and habit_id:
+            for h in TINY_HABITS.get(pillar, []):
+                if h['id'] == habit_id:
+                    chosen_list.append({
+                        **h,
+                        'pillar': pillar,
+                        'started': datetime.now().strftime('%Y-%m-%d')
+                    })
+                    break
+
     if 'user' not in session:
-        if chosen:
-            session['guest_habit'] = chosen
-            flash(f'Đã chọn: {chosen["title"]}. Đăng ký để lưu thói quen và check-in hằng ngày.', 'success')
+        if chosen_list:
+            session['guest_habit'] = chosen_list[0]  # keep one for guest flow
+            session['guest_habits'] = chosen_list
+            titles = ', '.join(c['title'] for c in chosen_list)
+            flash(f'Đã chọn: {titles}. Đăng ký để lưu thói quen và check-in hằng ngày.', 'success')
         return redirect(url_for('register'))
 
     redir = require_assessment_done()
     if redir:
         return redir
-    if chosen:
-        users[session['user']]['habit'] = chosen
+    if chosen_list:
+        user = users[session['user']]
+        user['habits'] = chosen_list
+        user['habit'] = chosen_list[0]  # keep legacy field
         save_users(users)
-        flash(f'Bạn đã chọn thói quen: {chosen["title"]}. Chúc bạn kiên trì!', 'success')
+        titles = ', '.join(c['title'] for c in chosen_list)
+        flash(f'Bạn đã chọn {len(chosen_list)} thói quen: {titles}. Chúc bạn kiên trì!', 'success')
     return redirect(url_for('home'))
 
 
@@ -1761,68 +1811,89 @@ def checkin():
     if redir:
         return redir
     user = users[session['user']]
+    habits = _normalize_habits(user)
     if request.method == 'POST':
         mood = request.form.get('mood', '3').strip()
         note = request.form.get('note', '').strip()
-        habit_done = request.form.get('habit_done') == 'yes'
+        symptoms = request.form.getlist('symptoms')
         try:
             mood_value = int(mood)
             sleep_hours = float(request.form.get('sleep_hours', ''))
+            sleep_quality = int(request.form.get('sleep_quality', '3'))
             water_glasses = int(request.form.get('water_glasses', ''))
             activity_minutes = int(request.form.get('activity_minutes', ''))
+            stress_level = int(request.form.get('stress_level', '3'))
+            energy_level = int(request.form.get('energy_level', '3'))
         except (TypeError, ValueError):
             mood_value = 0
             sleep_hours = -1
+            sleep_quality = 0
             water_glasses = -1
             activity_minutes = -1
+            stress_level = 0
+            energy_level = 0
         if (not 1 <= mood_value <= 5 or not 0 <= sleep_hours <= 24 or
-                not 0 <= water_glasses <= 30 or not 0 <= activity_minutes <= 600):
+                not 1 <= sleep_quality <= 5 or
+                not 0 <= water_glasses <= 30 or not 0 <= activity_minutes <= 600 or
+                not 1 <= stress_level <= 5 or not 1 <= energy_level <= 5):
             flash('Vui lòng nhập đúng các chỉ số sức khỏe trong giới hạn cho phép.', 'error')
             return render_template('checkin.html',
                                    name=session.get('name', 'Bạn'),
-                                   habit=user.get('habit'),
+                                   habits=habits,
+                                   habit=habits[0] if habits else None,
                                    pillar_names=PILLAR_NAMES,
                                    pillar_icons=PILLAR_ICONS,
                                    form_values=request.form)
+        # Track which habits were done
+        habits_done = []
+        for h in habits:
+            if request.form.get(f'habit_done_{h["id"]}') == 'yes':
+                habits_done.append(h['id'])
+                pillar = h.get('pillar')
+                if pillar and user['scores'].get(pillar, 0) < 5:
+                    user['scores'][pillar] = round(min(5, float(user['scores'][pillar]) + 0.1), 2)
         checkin_data = {
             'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
             'mood': mood_value,
             'note': note,
-            'habit_done': habit_done,
+            'symptoms': symptoms,
+            'habit_done': len(habits_done) > 0,
+            'habits_done': habits_done,
             'sleep_hours': sleep_hours,
+            'sleep_quality': sleep_quality,
             'water_glasses': water_glasses,
-            'activity_minutes': activity_minutes
+            'activity_minutes': activity_minutes,
+            'stress_level': stress_level,
+            'energy_level': energy_level,
         }
         user.setdefault('checkins', []).append(checkin_data)
-        if habit_done and user.get('habit'):
-            pillar = user['habit']['pillar']
-            if user['scores'].get(pillar, 0) < 5:
-                user['scores'][pillar] = round(min(5, float(user['scores'][pillar]) + 0.15), 2)
         save_users(users)
         ok, msg = sync_checkin_to_sheets(session['user'], {
             'name': session.get('name'),
             'mood': mood,
-            'habit_done': 'yes' if habit_done else 'no',
-            'habit_title': (user.get('habit') or {}).get('title', ''),
+            'habit_done': 'yes' if habits_done else 'no',
+            'habit_title': ', '.join(h['title'] for h in habits if h['id'] in habits_done),
             'note': note,
             'sleep_hours': sleep_hours,
             'water_glasses': water_glasses,
             'activity_minutes': activity_minutes,
-            'scores': user['scores']
+            'scores': user['scores'],
         })
         if ok:
-            flash('Cảm ơn bạn đã check-in! Đã đồng bộ lên Google Sheet.', 'success')
+            flash('Đã lưu check-in. Cảm ơn bạn đã dành thời gian cho bản thân.', 'success')
         else:
-            flash('Cảm ơn bạn đã check-in hôm nay!', 'success')
+            flash('Đã lưu check-in cục bộ. Đồng bộ sheet: ' + str(msg), 'info')
+        # Red-flag from mood/stress
+        if mood_value <= 2 or stress_level >= 5:
+            flash('Nếu bạn đang cảm thấy rất khó chịu, hãy cân nhắc chia sẻ với người thân hoặc chuyên gia.', 'info')
         return redirect(url_for('home'))
     return render_template('checkin.html',
                            name=session.get('name', 'Bạn'),
-                           habit=user.get('habit'),
+                           habits=habits,
+                           habit=habits[0] if habits else None,
                            pillar_names=PILLAR_NAMES,
                            pillar_icons=PILLAR_ICONS,
                            form_values={})
-
-
 @app.route('/trends')
 def trends():
     redir = require_assessment_done()
@@ -1838,9 +1909,12 @@ def trends():
     mood_avg = {d: round(sum(v) / len(v), 1) for d, v in sorted(mood_by_day.items())}
     wellness_fields = {
         'sleep_hours': ('Giấc ngủ', 'giờ/đêm'),
+        'sleep_quality': ('Chất lượng ngủ', 'điểm/5'),
         'water_glasses': ('Nước', 'ly/ngày'),
         'activity_minutes': ('Vận động', 'phút/ngày'),
-        'mood': ('Tâm trạng', 'điểm/5')
+        'mood': ('Tâm trạng', 'điểm/5'),
+        'stress_level': ('Căng thẳng', 'điểm/5'),
+        'energy_level': ('Năng lượng', 'điểm/5'),
     }
     today = datetime.now().date()
     recent_start = today - timedelta(days=6)
@@ -1874,6 +1948,39 @@ def trends():
         for key, (label, unit) in wellness_fields.items()
         if (values := recent_values[key])
     }
+
+    # Simple insight: days with low sleep vs average mood
+    insights = []
+    low_sleep_moods = []
+    good_sleep_moods = []
+    high_stress_days = 0
+    for c in checkins[-14:]:
+        try:
+            sh = float(c.get('sleep_hours', 0))
+            mq = float(c.get('mood', 3))
+            st = float(c.get('stress_level', 3))
+            if sh > 0 and sh < 6:
+                low_sleep_moods.append(mq)
+            elif sh >= 7:
+                good_sleep_moods.append(mq)
+            if st >= 4:
+                high_stress_days += 1
+        except (TypeError, ValueError):
+            pass
+    if low_sleep_moods and good_sleep_moods:
+        avg_low = round(sum(low_sleep_moods) / len(low_sleep_moods), 1)
+        avg_good = round(sum(good_sleep_moods) / len(good_sleep_moods), 1)
+        if avg_good > avg_low:
+            insights.append(
+                f'Khi ngủ ≥ 7 giờ, tâm trạng trung bình ({avg_good}) cao hơn những ngày ngủ < 6 giờ ({avg_low}).'
+            )
+    if high_stress_days >= 3:
+        insights.append(
+            f'Trong 14 ngày gần đây có {high_stress_days} ngày căng thẳng cao (≥ 4). Hãy ưu tiên các thói quen thư giãn nhỏ.'
+        )
+    if not insights and checkins:
+        insights.append('Tiếp tục check-in đều đặn để hệ thống nhận ra mẫu hình của bạn.')
+
     return render_template('trends.html',
                            name=session.get('name', 'Bạn'),
                            history=history,
@@ -1882,7 +1989,9 @@ def trends():
                            pillar_names=PILLAR_NAMES,
                            pillar_icons=PILLAR_ICONS,
                            checkin_count=len(checkins),
-                           wellness_summary=wellness_summary)
+                           wellness_summary=wellness_summary,
+                           insights=insights,
+                           red_flags=detect_red_flags(user.get('scores', {})))
 
 
 @app.route('/info')

@@ -7,6 +7,28 @@
   Nhìn lại hành trình theo thời gian. Không so sánh với người khác — chỉ với chính mình.
 </p>
 
+{% if red_flags %}
+<div class="card" style="background:#FEF3F2;border:1.5px solid #F5C2C0;margin-bottom:1rem;">
+  <div class="card-title" style="color:#B42318;">⚠️ Cần quan tâm thêm</div>
+  <p style="font-size:0.9rem;color:#7A2E2A;margin:0;">
+    Trụ cột Cảm xúc hoặc Tinh thần đang ở mức thấp. Đây không phải chẩn đoán.
+    Nếu bạn cảm thấy rất mệt mỏi hoặc tuyệt vọng, hãy tìm hỗ trợ từ người thân hoặc chuyên gia.
+    <a href="tel:19006118" style="font-weight:700;">Gọi đường dây hỗ trợ</a>
+  </p>
+</div>
+{% endif %}
+
+{% if insights %}
+<div class="card">
+  <div class="card-title">💡 Nhận xét từ dữ liệu của bạn</div>
+  <ul style="margin:0;padding-left:1.2rem;color:var(--text-muted);font-size:0.92rem;line-height:1.55;">
+    {% for tip in insights %}
+    <li style="margin-bottom:0.4rem;">{{ tip }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card-title">Bản đồ hiện tại</div>
   <div class="score-grid">

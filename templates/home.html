@@ -7,15 +7,39 @@
   <p>Hôm nay bạn muốn chăm sóc bản thân như thế nào?</p>
 </div>
 
-{% if habit %}
-<div class="habit-active">
-  <div class="label">Thói quen đang theo dõi</div>
-  <div class="title">{{ habit.title }}</div>
-  <div class="meta">
-    {{ pillar_icons.get(habit.pillar, '') }} {{ pillar_names.get(habit.pillar, '') }}
-    · Gắn mốc: {{ habit.anchor }}
-    · Từ {{ habit.started }}
+{% if red_flags %}
+<div class="card" style="background:#FEF3F2;border:1.5px solid #F5C2C0;margin-bottom:1rem;" role="alert">
+  <div class="card-title" style="color:#B42318;">⚠️ Cần quan tâm thêm</div>
+  <p style="font-size:0.9rem;color:#7A2E2A;margin-bottom:0.5rem;">
+    Cảm xúc hoặc Tinh thần đang ở mức thấp. Đây không phải chẩn đoán.
+    Nếu bạn cảm thấy rất mệt mỏi hoặc tuyệt vọng, hãy tìm hỗ trợ.
+  </p>
+  <a href="tel:19006118" class="btn btn-primary btn-sm">Gọi 1900 6118</a>
+  <a href="{{ url_for('info') }}" class="btn btn-ghost btn-sm">Nguồn hỗ trợ</a>
+</div>
+{% endif %}
+
+{% if habits %}
+<div class="card" style="margin-bottom:1rem;">
+  <div class="card-title">🌱 Thói quen đang theo dõi ({{ habits|length }})</div>
+  {% for h in habits %}
+  <div class="habit-active" style="margin-bottom:0.7rem;">
+    <div class="title">{{ h.title }}</div>
+    <div class="meta">
+      {{ pillar_icons.get(h.pillar, '') }} {{ pillar_names.get(h.pillar, '') }}
+      · Gắn mốc: {{ h.anchor }}
+      · Từ {{ h.started }}
+    </div>
   </div>
+  {% endfor %}
+  <a href="{{ url_for('map_result') }}" class="btn btn-ghost btn-sm">Thay đổi thói quen</a>
+</div>
+{% elif has_map %}
+<div class="card card-soft" style="margin-bottom:1rem;">
+  <p style="font-size:0.92rem;color:var(--text-muted);margin:0;">
+    Bạn chưa chọn thói quen nào.
+    <a href="{{ url_for('map_result') }}" style="font-weight:700;">Chọn 1–3 thói quen siêu nhỏ →</a>
+  </p>
 </div>
 {% endif %}
 

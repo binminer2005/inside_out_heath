@@ -14,6 +14,17 @@
   .result-panel.active { display: block; animation: fadeSlide 0.25s ease; }
   .chart-actions { display: flex; gap: 0.65rem; margin-top: 1rem; }
   .chart-actions .btn { flex: 1; }
+  .redflag-card {
+    background: #FEF3F2; border: 1.5px solid #F5C2C0; border-radius: var(--radius);
+    padding: 1.1rem 1.2rem; margin-bottom: 1.1rem;
+  }
+  .redflag-card .title { font-weight: 800; color: #B42318; margin-bottom: 0.4rem; }
+  .redflag-card p { font-size: 0.9rem; color: #7A2E2A; margin-bottom: 0.7rem; line-height: 1.5; }
+  .redflag-card .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .habit-option input[type="checkbox"] { width: 1.15rem; height: 1.15rem; accent-color: var(--forest); }
+  .pillar-group { margin-bottom: 1.1rem; }
+  .pillar-group .pg-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.45rem; color: var(--forest); }
+  .selected-count { font-size: 0.85rem; color: var(--text-muted); margin: 0.6rem 0 0.2rem; }
   @media (max-width: 420px) {
     .chart-actions { flex-direction: column; }
   }
@@ -32,6 +43,21 @@
 </div>
 {% endif %}
 
+{% if red_flags %}
+<div class="redflag-card" role="alert">
+  <div class="title">⚠️ Cần quan tâm thêm</div>
+  <p>
+    Một số trụ cột Cảm xúc / Tinh thần đang ở mức thấp.
+    Đây không phải chẩn đoán, nhưng nếu bạn đang cảm thấy rất mệt mỏi, tuyệt vọng hoặc có ý nghĩ tự làm tổn thương bản thân,
+    hãy tìm sự hỗ trợ từ người thân hoặc chuyên gia ngay.
+  </p>
+  <div class="actions">
+    <a href="tel:19006118" class="btn btn-primary btn-sm">Gọi đường dây hỗ trợ (VN)</a>
+    <a href="{{ url_for('info') }}" class="btn btn-ghost btn-sm">Xem nguồn hỗ trợ</a>
+  </div>
+</div>
+{% endif %}
+
 <div class="steps">
   <div class="step-dot"></div>
   <div class="step-dot active"></div>
@@ -39,12 +65,9 @@
 </div>
 
 <h1 class="page-title">🗺️ Bản đồ của {{ name }}</h1>
-<p class="page-subtitle">
-  Đây là cảm nhận của bạn tại thời điểm này. Không phải kết luận y khoa.
-  Hãy chọn <strong>1 trụ cột</strong> để bắt đầu với một thói quen siêu nhỏ.
-</p>
+<p class="page-subtitle">Nhìn lại 6 trụ cột cân bằng Thể – Tâm. Chọn 1–3 thói quen siêu nhỏ để bắt đầu.</p>
 
-<div class="result-tabs" role="tablist" aria-label="Kết quả bản đồ">
+<div class="result-tabs" role="tablist">
   <button class="result-tab active" type="button" role="tab" aria-selected="true" data-tab="summaryPanel">
     1. Tổng quan
   </button>
@@ -81,32 +104,37 @@
 
 <div class="suggest-banner">
   <div class="label">Gợi ý bắt đầu</div>
-  <div class="title">{{ pillar_icons[lowest] }} {{ pillar_names[lowest] }}</div>
-  <p>Trụ cột này đang cần sự quan tâm hơn. Chỉ cần chọn 1 thói quen siêu nhỏ — nhỏ mà bền.</p>
+  <div class="title">Ưu tiên các trụ cột đang cần quan tâm</div>
+  <p>Chọn tối đa <strong>3 thói quen siêu nhỏ</strong> từ các trụ cột dưới đây. Nhỏ mà bền sẽ dễ duy trì hơn.</p>
 </div>
 
 <div class="card">
-  <div class="card-title">🌱 Chọn 1 thói quen siêu nhỏ</div>
+  <div class="card-title">🌱 Chọn 1–3 thói quen siêu nhỏ</div>
   <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1rem;">
-    Gắn vào một mốc có sẵn trong ngày của bạn. Chỉ theo dõi 1 thói quen tại một thời điểm.
+    Gắn vào một mốc có sẵn trong ngày. Bạn có thể thay đổi sau.
   </p>
 
-  <form method="POST" action="{{ url_for('choose_habit') }}">
-    <input type="hidden" name="pillar" value="{{ lowest }}">
-    <div class="habit-list">
-      {% for h in habits %}
-      <label class="habit-option">
-        <input type="radio" name="habit_id" value="{{ h.id }}" required {% if loop.first %}checked{% endif %}>
-        <div>
-          <div class="title">{{ h.title }}</div>
-          <div class="anchor">Gắn mốc: {{ h.anchor }}</div>
-        </div>
-      </label>
-      {% endfor %}
+  <form method="POST" action="{{ url_for('choose_habit') }}" id="habitForm">
+    {% for pillar, habits_list in suggested_habits.items() %}
+    <div class="pillar-group">
+      <div class="pg-title">{{ pillar_icons[pillar] }} {{ pillar_names[pillar] }} ({{ scores[pillar] }})</div>
+      <div class="habit-list">
+        {% for h in habits_list %}
+        <label class="habit-option">
+          <input type="checkbox" name="habit_ids" value="{{ pillar }}::{{ h.id }}">
+          <div>
+            <div class="title">{{ h.title }}</div>
+            <div class="anchor">Gắn mốc: {{ h.anchor }}</div>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
     </div>
+    {% endfor %}
 
-    <button type="submit" class="btn btn-primary btn-block mt-2">
-      Bắt đầu thói quen này →
+    <p class="selected-count" id="selectedCount">Đã chọn: 0 / 3</p>
+    <button type="submit" class="btn btn-primary btn-block mt-1" id="habitSubmit" disabled>
+      Bắt đầu các thói quen đã chọn →
     </button>
   </form>
 </div>
@@ -120,55 +148,34 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
   const personName = {{ name|tojson }};
-  const chart = new Chart(document.getElementById('radarChart').getContext('2d'), {
+  const scoreValues = [
+    {{ scores.giac_ngu }}, {{ scores.dinh_duong }}, {{ scores.van_dong }},
+    {{ scores.nhip_sinh_hoc }}, {{ scores.cam_xuc }}, {{ scores.tinh_than }}
+  ];
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  const chart = new Chart(ctx, {
     type: 'radar',
     data: {
       labels: ['Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần'],
       datasets: [{
-        label: 'Cảm nhận (1-5)',
-        data: [
-          {{ scores.giac_ngu }},
-          {{ scores.dinh_duong }},
-          {{ scores.van_dong }},
-          {{ scores.nhip_sinh_hoc }},
-          {{ scores.cam_xuc }},
-          {{ scores.tinh_than }}
-        ],
+        label: 'Điểm',
+        data: scoreValues,
         backgroundColor: 'rgba(49, 92, 80, 0.18)',
-        borderColor: 'rgba(49, 92, 80, 0.9)',
-        borderWidth: 2.5,
-        pointBackgroundColor: [
-          '#FFD166', '#A8BDA8', '#F2B49B', '#A7D8F0', '#C9B6E4', '#315C50'
-        ],
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 5
+        borderColor: '#315C50',
+        pointBackgroundColor: '#315C50',
+        borderWidth: 2
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: true,
       scales: {
         r: {
-          min: 0,
-          max: 5,
-          ticks: {
-            stepSize: 1,
-            backdropColor: 'transparent',
-            font: { size: 10, family: 'Nunito' },
-            color: '#8A9B97'
-          },
-          grid: { color: 'rgba(49, 92, 80, 0.08)' },
-          angleLines: { color: 'rgba(49, 92, 80, 0.08)' },
-          pointLabels: {
-            font: { size: 11, weight: '600', family: 'Nunito' },
-            color: '#2C3E3A'
-          }
+          min: 0, max: 5, ticks: { stepSize: 1, display: false },
+          grid: { color: 'rgba(49,92,80,0.12)' },
+          angleLines: { color: 'rgba(49,92,80,0.12)' },
+          pointLabels: { font: { size: 12, weight: '600' }, color: '#2C3E3A' }
         }
       },
-      plugins: {
-        legend: { display: false }
-      }
+      plugins: { legend: { display: false } }
     }
   });
 
@@ -224,5 +231,22 @@
     link.href = exportCanvas.toDataURL('image/png');
     link.click();
   });
+
+  // Multi-habit selection (max 3)
+  const checkboxes = document.querySelectorAll('input[name="habit_ids"]');
+  const countEl = document.getElementById('selectedCount');
+  const submitBtn = document.getElementById('habitSubmit');
+  function updateHabitCount() {
+    const checked = [...checkboxes].filter(c => c.checked);
+    countEl.textContent = 'Đã chọn: ' + checked.length + ' / 3';
+    submitBtn.disabled = checked.length === 0;
+    if (checked.length >= 3) {
+      checkboxes.forEach(c => { if (!c.checked) c.disabled = true; });
+    } else {
+      checkboxes.forEach(c => { c.disabled = false; });
+    }
+  }
+  checkboxes.forEach(c => c.addEventListener('change', updateHabitCount));
+  updateHabitCount();
 </script>
 {% endblock %}
