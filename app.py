@@ -514,6 +514,7 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores, submission_id=
         _update_assessment_sync(submission_id, 'failed')
         return False, 'Cần cài: pip install gspread google-auth'
     except Exception as e:
+        app.logger.exception('Google Sheets assessment sync failed')
         _update_assessment_sync(submission_id, 'failed')
         return False, f'Lỗi sync: {str(e)[:150]}'
 
@@ -2007,10 +2008,16 @@ def about():
 @app.route('/api/sync-status')
 def sync_status():
     configured = bool(SPREADSHEET_ID)
+    credentials_path = os.environ.get('GOOGLE_CREDENTIALS_PATH', '').strip()
+    if not credentials_path:
+        data_credentials = os.path.join(DATA_DIR, 'credentials.json')
+        root_credentials = os.path.join(os.path.dirname(__file__), 'credentials.json')
+        credentials_path = (
+            data_credentials if os.path.exists(data_credentials) else root_credentials
+        )
     has_creds = (
-        os.path.exists(os.path.join(DATA_DIR, 'credentials.json')) or
-        bool(os.environ.get('GOOGLE_CREDENTIALS_PATH')) or
-        bool(os.environ.get('GOOGLE_CREDENTIALS_JSON'))
+        bool(os.environ.get('GOOGLE_CREDENTIALS_JSON', '').strip()) or
+        os.path.isfile(credentials_path)
     )
     return jsonify({
         'configured': configured,
