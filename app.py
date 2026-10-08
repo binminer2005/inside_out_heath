@@ -1126,7 +1126,7 @@ def require_assessment_done():
         return redirect(url_for('login'))
     user = users.get(session['user'], {})
     if not user.get('assessment_done'):
-        flash('Hãy hoàn thành Bản đồ Tâm – Thể để bắt đầu nhé.', 'info')
+        flash('Hãy hoàn thành Bản đồ để bắt đầu nhé.', 'info')
         return redirect(url_for('assessment'))
     return None
 
@@ -1724,7 +1724,7 @@ def map_result():
     if is_guest:
         scores = get_guest_scores()
         if not scores or not any(scores.values()):
-            flash('Hãy vẽ Bản đồ trước nhé — không cần đăng nhập.', 'info')
+            flash('Hãy vẽ Bản đồ trước nhé — không cần đăng nhập cũng được.', 'info')
             return redirect(url_for('assessment'))
         name = session.get('guest_name', 'Bạn')
     else:
@@ -1789,7 +1789,7 @@ def choose_habit():
             session['guest_habit'] = chosen_list[0]  # keep one for guest flow
             session['guest_habits'] = chosen_list
             titles = ', '.join(c['title'] for c in chosen_list)
-            flash(f'Đã chọn: {titles}. Đăng ký để lưu thói quen và check-in hằng ngày.', 'success')
+            flash(f'Đã chọn: {titles}. Đăng ký để lưu và check-in hằng ngày nhé.', 'success')
         return redirect(url_for('register'))
 
     redir = require_assessment_done()
@@ -1801,7 +1801,7 @@ def choose_habit():
         user['habit'] = chosen_list[0]  # keep legacy field
         save_users(users)
         titles = ', '.join(c['title'] for c in chosen_list)
-        flash(f'Bạn đã chọn {len(chosen_list)} thói quen: {titles}. Chúc bạn kiên trì!', 'success')
+        flash(f'Đã chọn {len(chosen_list)} thói quen: {titles}. Cứ làm nhỏ thôi nhé.', 'success')
     return redirect(url_for('home'))
 
 
@@ -1836,7 +1836,7 @@ def checkin():
                 not 1 <= sleep_quality <= 5 or
                 not 0 <= water_glasses <= 30 or not 0 <= activity_minutes <= 600 or
                 not 1 <= stress_level <= 5 or not 1 <= energy_level <= 5):
-            flash('Vui lòng nhập đúng các chỉ số sức khỏe trong giới hạn cho phép.', 'error')
+            flash('Bạn ơi, kiểm tra lại các chỉ số giúp mình (trong giới hạn cho phép nhé).', 'error')
             return render_template('checkin.html',
                                    name=session.get('name', 'Bạn'),
                                    habits=habits,
@@ -1880,12 +1880,12 @@ def checkin():
             'scores': user['scores'],
         })
         if ok:
-            flash('Đã lưu check-in. Cảm ơn bạn đã dành thời gian cho bản thân.', 'success')
+            flash('Đã lưu check-in. Cảm ơn bạn đã dành thời gian cho mình.', 'success')
         else:
             flash('Đã lưu check-in cục bộ. Đồng bộ sheet: ' + str(msg), 'info')
         # Red-flag from mood/stress
         if mood_value <= 2 or stress_level >= 5:
-            flash('Nếu bạn đang cảm thấy rất khó chịu, hãy cân nhắc chia sẻ với người thân hoặc chuyên gia.', 'info')
+            flash('Nếu dạo này bạn thấy mệt nhiều, hãy chia sẻ với ai đó bạn tin nhé.', 'info')
         return redirect(url_for('home'))
     return render_template('checkin.html',
                            name=session.get('name', 'Bạn'),
@@ -1972,14 +1972,14 @@ def trends():
         avg_good = round(sum(good_sleep_moods) / len(good_sleep_moods), 1)
         if avg_good > avg_low:
             insights.append(
-                f'Khi ngủ ≥ 7 giờ, tâm trạng trung bình ({avg_good}) cao hơn những ngày ngủ < 6 giờ ({avg_low}).'
+                f'Khi ngủ ≥ 7 giờ, tâm trạng trung bình ({avg_good}) dễ chịu hơn những ngày ngủ < 6 giờ ({avg_low}).'
             )
     if high_stress_days >= 3:
         insights.append(
-            f'Trong 14 ngày gần đây có {high_stress_days} ngày căng thẳng cao (≥ 4). Hãy ưu tiên các thói quen thư giãn nhỏ.'
+            f'Trong 14 ngày gần đây có {high_stress_days} ngày căng thẳng hơi cao. Ưu tiên vài thói quen thư giãn nhỏ cũng tốt đó.'
         )
     if not insights and checkins:
-        insights.append('Tiếp tục check-in đều đặn để hệ thống nhận ra mẫu hình của bạn.')
+        insights.append('Cứ check-in thêm vài ngày, mình sẽ nhận ra nhịp của bạn rõ hơn.')
 
     return render_template('trends.html',
                            name=session.get('name', 'Bạn'),

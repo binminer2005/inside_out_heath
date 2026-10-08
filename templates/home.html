@@ -4,18 +4,18 @@
 {% block content %}
 <div class="greeting">
   <h1>Xin chào, {{ name }} 👋</h1>
-  <p>Hôm nay bạn muốn chăm sóc bản thân như thế nào?</p>
+  <p>Hôm nay bạn muốn chăm sóc mình thế nào?</p>
 </div>
 
 {% if red_flags %}
 <div class="card" style="background:#FEF3F2;border:1.5px solid #F5C2C0;margin-bottom:1rem;" role="alert">
-  <div class="card-title" style="color:#B42318;">⚠️ Cần quan tâm thêm</div>
+  <div class="card-title" style="color:#B42318;">Có một chỗ đang cần được chăm sóc thêm</div>
   <p style="font-size:0.9rem;color:#7A2E2A;margin-bottom:0.5rem;">
-    Cảm xúc hoặc Tinh thần đang ở mức thấp. Đây không phải chẩn đoán.
-    Nếu bạn cảm thấy rất mệt mỏi hoặc tuyệt vọng, hãy tìm hỗ trợ.
+    Cảm xúc hoặc Tinh thần dạo này có vẻ đang thấp một chút. Đây không phải kết luận gì về bạn.
+    Nếu bạn thấy mệt nhiều hoặc cần được lắng nghe, hãy nói chuyện với người thân hoặc tìm hỗ trợ nhé.
   </p>
   <a href="tel:19006118" class="btn btn-primary btn-sm">Gọi 1900 6118</a>
-  <a href="{{ url_for('info') }}" class="btn btn-ghost btn-sm">Nguồn hỗ trợ</a>
+  <a href="{{ url_for('info') }}" class="btn btn-ghost btn-sm">Xem nguồn hỗ trợ</a>
 </div>
 {% endif %}
 
@@ -45,7 +45,7 @@
 
 {% if has_map %}
 <div class="card">
-  <div class="card-title">🗺️ Bản đồ Tâm – Thể hiện tại</div>
+  <div class="card-title">🗺️ Bản đồ hiện tại</div>
   <div class="radar-container">
     <canvas id="radarChart" width="300" height="300"></canvas>
   </div>
@@ -65,8 +65,8 @@
 {% else %}
 <div class="card empty-state">
   <div class="icon">🗺️</div>
-  <p>Bạn chưa có Bản đồ Tâm – Thể.<br>Hãy dành 3–5 phút để tự đánh giá lần đầu.</p>
-  <a href="{{ url_for('assessment') }}" class="btn btn-primary">Vẽ bản đồ ngay</a>
+  <p>Bạn chưa có Bản đồ.<br>Dành vài phút để vẽ lần đầu nhé.</p>
+  <a href="{{ url_for('assessment') }}" class="btn btn-primary">Vẽ Bản đồ ngay</a>
 </div>
 {% endif %}
 
@@ -77,7 +77,7 @@
   </a>
   <a href="{{ url_for('assessment') }}" class="quick-action">
     <div class="icon">📝</div>
-    <div class="label">Cập nhật bản đồ</div>
+    <div class="label">Cập nhật Bản đồ</div>
   </a>
   <a href="{{ url_for('map_result') }}" class="quick-action">
     <div class="icon">🌱</div>

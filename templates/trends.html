@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Xu hướng – InsideOut HEALTH{% endblock %}
+{% block title %}Xu hướng – InsideOut{% endblock %}
 
 {% block content %}
 <h1 class="page-title">📈 Xu hướng của {{ name }}</h1>
 <p class="page-subtitle">
-  Nhìn lại hành trình theo thời gian. Không so sánh với người khác — chỉ với chính mình.
+  Nhìn lại hành trình theo thời gian. Chỉ so với chính mình thôi.
 </p>
 
 {% if red_flags %}
 <div class="card" style="background:#FEF3F2;border:1.5px solid #F5C2C0;margin-bottom:1rem;">
-  <div class="card-title" style="color:#B42318;">⚠️ Cần quan tâm thêm</div>
+  <div class="card-title" style="color:#B42318;">Có một chỗ đang cần được chăm sóc thêm</div>
   <p style="font-size:0.9rem;color:#7A2E2A;margin:0;">
-    Trụ cột Cảm xúc hoặc Tinh thần đang ở mức thấp. Đây không phải chẩn đoán.
-    Nếu bạn cảm thấy rất mệt mỏi hoặc tuyệt vọng, hãy tìm hỗ trợ từ người thân hoặc chuyên gia.
+    Cảm xúc hoặc Tinh thần dạo này có vẻ đang thấp một chút. Đây không phải kết luận gì về bạn.
+    Nếu bạn thấy mệt nhiều hoặc cần được lắng nghe, hãy tìm hỗ trợ nhé.
     <a href="tel:19006118" style="font-weight:700;">Gọi đường dây hỗ trợ</a>
   </p>
 </div>
@@ -46,7 +46,7 @@
 <div class="card">
   <div class="card-title">Lịch sử Bản đồ</div>
   <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1rem;">
-    Các lần bạn đã cập nhật Bản đồ Tâm – Thể.
+    Các lần bạn đã cập nhật Bản đồ.
   </p>
   <div class="history-list">
     {% for h in history|reverse %}
@@ -64,7 +64,7 @@
 {% else %}
 <div class="card empty-state">
   <div class="icon">📊</div>
-  <p>Chưa có lịch sử Bản đồ.<br>Hãy cập nhật Bản đồ để theo dõi xu hướng.</p>
+  <p>Chưa có lịch sử Bản đồ.<br>Cập nhật Bản đồ để xem xu hướng nhé.</p>
   <a href="{{ url_for('assessment') }}" class="btn btn-primary btn-sm">Cập nhật Bản đồ</a>
 </div>
 {% endif %}
@@ -87,8 +87,8 @@
 {% endif %}
 
 <div class="card">
-  <div class="card-title">Theo dõi sức khỏe · 7 ngày gần đây</div>
-  <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1rem;">Chỉ số trung bình được so với 7 ngày liền trước, dựa trên những lần bạn đã check-in.</p>
+  <div class="card-title">Theo dõi · 7 ngày gần đây</div>
+  <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:1rem;">Trung bình so với tuần trước, dựa trên những lần bạn đã check-in.</p>
   {% if wellness_summary %}
   <div class="score-grid">
     {% for item in wellness_summary.values() %}
@@ -109,7 +109,7 @@
   </div>
   {% else %}
   <p style="font-size:0.88rem;color:var(--text-muted);">
-    Chưa có dữ liệu. Ghi nhận giấc ngủ, nước uống và vận động trong check-in hằng ngày để theo dõi.
+    Chưa có dữ liệu. Ghi nhận thêm trong check-in hằng ngày để xem xu hướng nhé.
   </p>
   {% endif %}
   <a href="{{ url_for('checkin') }}" class="btn btn-outline btn-sm mt-1">Check-in hôm nay</a>
@@ -122,6 +122,6 @@
 </div>
 
 <p class="text-center" style="font-size:0.85rem;color:var(--text-light);">
-  Dữ liệu được lưu cục bộ và có thể đồng bộ lên Google Sheet khi cấu hình.
+  Dữ liệu được lưu trên máy của bạn. Đồng bộ sheet khi cấu hình cũng được.
 </p>
 {% endblock %}

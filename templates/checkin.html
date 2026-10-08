@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Check-in – InsideOut HEALTH{% endblock %}
+{% block title %}Check-in hôm nay – InsideOut{% endblock %}
 
 {% block content %}
 <h1 class="page-title">✅ Check-in hôm nay</h1>
-<p class="page-subtitle">Ghi nhận nhẹ nhàng. Không cần hoàn hảo.</p>
+<p class="page-subtitle">Ghi nhận nhẹ thôi. Không cần hoàn hảo.</p>
 
 <form method="POST" action="{{ url_for('checkin') }}">
   <div class="card">
-    <div class="card-title">Tâm trạng hôm nay</div>
+    <div class="card-title">Hôm nay bạn thấy thế nào?</div>
     <div class="mood-row">
       <label>
         <input type="radio" name="mood" value="1" {% if form_values.get('mood') == '1' %}checked{% endif %} required>
@@ -35,40 +35,40 @@
   <div class="card">
     <div class="card-title">Chăm sóc cơ thể hôm nay</div>
     <div class="form-group">
-      <label for="sleep_hours">Bạn đã ngủ bao nhiêu giờ?</label>
+      <label for="sleep_hours">Bạn ngủ khoảng bao nhiêu giờ?</label>
       <input id="sleep_hours" name="sleep_hours" type="number" min="0" max="24" step="0.5" required
              value="{{ form_values.get('sleep_hours', '') }}" placeholder="Ví dụ: 7.5">
     </div>
     <div class="form-group">
-      <label for="sleep_quality">Chất lượng giấc ngủ (1 = rất kém, 5 = rất tốt)</label>
+      <label for="sleep_quality">Chất lượng giấc ngủ (1 = rất kém · 5 = rất tốt)</label>
       <input id="sleep_quality" name="sleep_quality" type="number" min="1" max="5" step="1" required
              value="{{ form_values.get('sleep_quality', '3') }}" placeholder="1–5">
     </div>
     <div class="form-group">
-      <label for="water_glasses">Hôm nay bạn uống khoảng bao nhiêu ly nước?</label>
+      <label for="water_glasses">Khoảng bao nhiêu ly nước?</label>
       <input id="water_glasses" name="water_glasses" type="number" min="0" max="30" step="1" required
              value="{{ form_values.get('water_glasses', '') }}" placeholder="Ví dụ: 6">
     </div>
     <div class="form-group">
-      <label for="activity_minutes">Bạn vận động bao nhiêu phút?</label>
+      <label for="activity_minutes">Vận động khoảng bao nhiêu phút?</label>
       <input id="activity_minutes" name="activity_minutes" type="number" min="0" max="600" step="1" required
              value="{{ form_values.get('activity_minutes', '') }}" placeholder="Ví dụ: 20">
     </div>
     <div class="form-group">
-      <label for="stress_level">Mức căng thẳng hôm nay (1 = rất thấp, 5 = rất cao)</label>
+      <label for="stress_level">Mức căng thẳng (1 = rất thấp · 5 = rất cao)</label>
       <input id="stress_level" name="stress_level" type="number" min="1" max="5" step="1" required
              value="{{ form_values.get('stress_level', '3') }}" placeholder="1–5">
     </div>
     <div class="form-group" style="margin-bottom:0;">
-      <label for="energy_level">Mức năng lượng (1 = rất thấp, 5 = rất cao)</label>
+      <label for="energy_level">Mức năng lượng (1 = rất thấp · 5 = rất cao)</label>
       <input id="energy_level" name="energy_level" type="number" min="1" max="5" step="1" required
              value="{{ form_values.get('energy_level', '3') }}" placeholder="1–5">
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title">Triệu chứng nổi bật (tuỳ chọn)</div>
-    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.7rem;">Chọn những gì bạn nhận thấy hôm nay.</p>
+    <div class="card-title">Có cảm giác nào nổi bật không? (tuỳ chọn)</div>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.7rem;">Chọn những gì bạn nhận thấy hôm nay cũng được.</p>
     <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
       {% set symptoms = ['Đau đầu', 'Mệt mỏi', 'Căng cơ', 'Khó tập trung', 'Lo âu', 'Buồn', 'Mất ngủ', 'Đầy hơi', 'Không có'] %}
       {% for s in symptoms %}
