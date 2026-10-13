@@ -244,6 +244,49 @@ def _get_gspread_client():
     return gspread.authorize(creds)
 
 
+def _get_or_create_worksheet(spreadsheet, title, rows, cols):
+    """Get a worksheet, creating it safely when concurrent requests race."""
+    import gspread
+
+    try:
+        return spreadsheet.worksheet(title)
+    except gspread.exceptions.WorksheetNotFound:
+        try:
+            worksheet = spreadsheet.add_worksheet(title=title, rows=rows, cols=cols)
+        except gspread.exceptions.APIError:
+            # Another request may have created the tab between worksheet() and
+            # add_worksheet(). Re-fetch it; preserve the original API error if
+            # the tab still does not exist (for example, a permission failure).
+            try:
+                return spreadsheet.worksheet(title)
+            except gspread.exceptions.WorksheetNotFound:
+                raise
+        return worksheet
+
+
+def _ensure_sheet_headers(worksheet, headers, field_map=None):
+    """Append any missing headers in one update, safe for concurrent callers."""
+    current = worksheet.row_values(1)
+    if field_map:
+        present = {
+            field_map.get(_normalize_sheet_header(header))
+            for header in current
+        }
+        missing = [
+            header for header in headers
+            if field_map.get(_normalize_sheet_header(header)) not in present
+        ]
+    else:
+        missing = [header for header in headers if header not in current]
+    if not missing:
+        return current
+    updated = current + missing
+    if len(updated) > worksheet.col_count:
+        worksheet.add_cols(len(updated) - worksheet.col_count)
+    worksheet.update('A1', [updated], value_input_option='RAW')
+    return updated
+
+
 def build_chart_image_url(scores):
     """Build a shareable radar-chart image URL for Google Sheets."""
     labels = ['Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần']
@@ -443,39 +486,23 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores, submission_id=
                     except (TypeError, ValueError):
                         age = timedelta(minutes=11)
                     if age < timedelta(minutes=10):
-                        return True, 'Bài làm này đang được đồng bộ'
+                        return False, 'Bài làm này đang được đồng bộ, vui lòng đợi một chút rồi thử lại.'
                 conn.execute(text('''UPDATE assessment_syncs SET status = 'processing', updated_at = :updated_at
                     WHERE submission_id = :submission_id'''), {
                     'updated_at': now.isoformat(), 'submission_id': submission_id
                 })
         gc = _get_gspread_client()
         sh = gc.open_by_key(SPREADSHEET_ID)
-        try:
-            ws = sh.worksheet(SHEET_NAME)
-        except Exception:
-            ws = sh.add_worksheet(title=SHEET_NAME, rows=2000, cols=60)
-            ws.append_row(ASSESSMENT_SHEET_HEADERS)
-        headers = ws.row_values(1)
+        ws = _get_or_create_worksheet(
+            sh, SHEET_NAME, rows=2000, cols=60
+        )
         header_field_map = _assessment_sheet_field_map()
+        headers = _ensure_sheet_headers(
+            ws, ASSESSMENT_SHEET_HEADERS, field_map=header_field_map
+        )
         normalized_fields = [
             header_field_map.get(_normalize_sheet_header(header)) for header in headers
         ]
-        present_fields = {field for field in normalized_fields if field}
-        missing_columns = [
-            (header, field) for header, field in ASSESSMENT_SHEET_COLUMNS
-            if field not in present_fields
-        ]
-        if missing_columns:
-            field_order = {field: index for index, (_, field) in enumerate(ASSESSMENT_SHEET_COLUMNS)}
-            for header, field in missing_columns:
-                insertion_index = next((index for index, existing_field in enumerate(normalized_fields)
-                                        if existing_field in field_order and
-                                        field_order[existing_field] > field_order[field]),
-                                       len(headers))
-                ws.insert_cols([[header]], col=insertion_index + 1,
-                               value_input_option='RAW', inherit_from_before=insertion_index > 0)
-                headers.insert(insertion_index, header)
-                normalized_fields.insert(insertion_index, field)
 
         score_values = [scores.get(key, '') for key in (
             'giac_ngu', 'dinh_duong', 'van_dong', 'nhip_sinh_hoc', 'cam_xuc', 'tinh_than'
@@ -525,18 +552,10 @@ def sync_checkin_to_sheets(user_email, payload):
     try:
         gc = _get_gspread_client()
         sh = gc.open_by_key(SPREADSHEET_ID)
-        try:
-            ws = sh.worksheet(CHECKIN_SHEET)
-        except Exception:
-            ws = sh.add_worksheet(title=CHECKIN_SHEET, rows=2000, cols=16)
-            ws.append_row(CHECKIN_SHEET_HEADERS)
-        headers = ws.row_values(1)
-        missing_headers = [header for header in CHECKIN_SHEET_HEADERS if header not in headers]
-        if missing_headers:
-            headers.extend(missing_headers)
-            if len(headers) > ws.col_count:
-                ws.add_cols(len(headers) - ws.col_count)
-            ws.update('A1', [headers], value_input_option='RAW')
+        ws = _get_or_create_worksheet(
+            sh, CHECKIN_SHEET, rows=2000, cols=16
+        )
+        headers = _ensure_sheet_headers(ws, CHECKIN_SHEET_HEADERS)
         row_by_header = {
             'timestamp': datetime.now().isoformat(timespec='seconds'),
             'email': user_email,

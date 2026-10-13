@@ -483,6 +483,14 @@
   btnPrev.addEventListener('click', function() {
     if (current > 0) { current--; updateUI(); }
   });
+  form.addEventListener('submit', function(event) {
+    if (!validateCurrentStep()) {
+      event.preventDefault();
+      return;
+    }
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = 'Đang lưu bản đồ…';
+  });
   pills.forEach(function(p, i) {
     p.addEventListener('click', function() {
       if (i <= current) { current = i; updateUI(); }
