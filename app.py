@@ -16,6 +16,7 @@ from email.message import EmailMessage
 from copy import deepcopy
 from urllib.parse import quote, urlsplit
 from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 from dotenv import load_dotenv
 
@@ -76,7 +77,14 @@ def _database_url():
     return 'sqlite:///' + os.path.join(DATA_DIR, 'insideout.db').replace('\\', '/')
 
 DATABASE_URL = _database_url()
-engine = create_engine(DATABASE_URL, future=True)
+# Hosted PostgreSQL connections can be closed while sitting idle in the pool.
+# Check before reusing them and periodically replace long-lived connections.
+engine = create_engine(
+    DATABASE_URL,
+    future=True,
+    pool_pre_ping=True,
+    pool_recycle=300,
+)
 
 def _init_database():
     with engine.begin() as conn:
@@ -462,6 +470,51 @@ def _update_assessment_sync(submission_id, status):
         })
 
 
+def _start_assessment_sync(submission_id, now):
+    """Claim a sync attempt, retrying once if PostgreSQL dropped its connection."""
+    for attempt in range(2):
+        try:
+            with engine.begin() as conn:
+                inserted = conn.execute(text('''INSERT INTO assessment_syncs
+                    (submission_id, status, updated_at) VALUES (:submission_id, 'processing', :updated_at)
+                    ON CONFLICT (submission_id) DO NOTHING'''), {
+                    'submission_id': submission_id, 'updated_at': now.isoformat()
+                })
+                if inserted.rowcount == 0:
+                    previous = conn.execute(text('''SELECT status, updated_at FROM assessment_syncs
+                        WHERE submission_id = :submission_id'''), {'submission_id': submission_id}).mappings().first()
+                    if previous and previous['status'] == 'synced':
+                        return 'synced'
+                    if previous and previous['status'] == 'processing':
+                        try:
+                            age = now - datetime.fromisoformat(previous['updated_at'])
+                        except (TypeError, ValueError):
+                            age = timedelta(minutes=11)
+                        if age < timedelta(minutes=10):
+                            return 'processing'
+                    conn.execute(text('''UPDATE assessment_syncs SET status = 'processing', updated_at = :updated_at
+                        WHERE submission_id = :submission_id'''), {
+                        'updated_at': now.isoformat(), 'submission_id': submission_id
+                    })
+            return 'claimed'
+        except OperationalError:
+            if attempt:
+                app.logger.exception('Could not claim assessment sync after reconnecting')
+                return 'unavailable'
+            engine.dispose()
+    return 'unavailable'
+
+
+def _safe_update_assessment_sync(submission_id, status):
+    """Best-effort status update; a ledger outage must not block Sheet sync."""
+    try:
+        _update_assessment_sync(submission_id, status)
+        return True
+    except OperationalError:
+        app.logger.exception('Could not update assessment sync status')
+        return False
+
+
 def sync_assessment_to_sheets(user_email, user_data, raw, scores, submission_id=None):
     """Append full assessment row to Google Sheet."""
     if not SPREADSHEET_ID:
@@ -469,28 +522,13 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores, submission_id=
     submission_id = submission_id or secrets.token_urlsafe(24)
     try:
         now = datetime.now().astimezone()
-        with engine.begin() as conn:
-            inserted = conn.execute(text('''INSERT INTO assessment_syncs
-                (submission_id, status, updated_at) VALUES (:submission_id, 'processing', :updated_at)
-                ON CONFLICT (submission_id) DO NOTHING'''), {
-                'submission_id': submission_id, 'updated_at': now.isoformat()
-            })
-            if inserted.rowcount == 0:
-                previous = conn.execute(text('''SELECT status, updated_at FROM assessment_syncs
-                    WHERE submission_id = :submission_id'''), {'submission_id': submission_id}).mappings().first()
-                if previous and previous['status'] == 'synced':
-                    return True, 'Bài làm này đã được đồng bộ trước đó'
-                if previous and previous['status'] == 'processing':
-                    try:
-                        age = now - datetime.fromisoformat(previous['updated_at'])
-                    except (TypeError, ValueError):
-                        age = timedelta(minutes=11)
-                    if age < timedelta(minutes=10):
-                        return False, 'Bài làm này đang được đồng bộ, vui lòng đợi một chút rồi thử lại.'
-                conn.execute(text('''UPDATE assessment_syncs SET status = 'processing', updated_at = :updated_at
-                    WHERE submission_id = :submission_id'''), {
-                    'updated_at': now.isoformat(), 'submission_id': submission_id
-                })
+        claim = _start_assessment_sync(submission_id, now)
+        if claim == 'synced':
+            return True, 'Bài làm này đã được đồng bộ trước đó'
+        if claim == 'processing':
+            return False, 'Bài làm này đang được đồng bộ, vui lòng đợi một chút rồi thử lại.'
+        # The sync ledger is an idempotency aid, not a prerequisite for saving the
+        # assessment. Continue to Google Sheets if the database is briefly down.
         gc = _get_gspread_client()
         sh = gc.open_by_key(SPREADSHEET_ID)
         ws = _get_or_create_worksheet(
@@ -535,14 +573,14 @@ def sync_assessment_to_sheets(user_email, user_data, raw, scores, submission_id=
             [row_by_field.get(field, '') if field else '' for field in normalized_fields],
             value_input_option='USER_ENTERED'
         )
-        _update_assessment_sync(submission_id, 'synced')
+        _safe_update_assessment_sync(submission_id, 'synced')
         return True, 'Đã đồng bộ Assessment lên Google Sheet'
     except ImportError:
-        _update_assessment_sync(submission_id, 'failed')
+        _safe_update_assessment_sync(submission_id, 'failed')
         return False, 'Cần cài: pip install gspread google-auth'
     except Exception as e:
         app.logger.exception('Google Sheets assessment sync failed')
-        _update_assessment_sync(submission_id, 'failed')
+        _safe_update_assessment_sync(submission_id, 'failed')
         return False, f'Lỗi sync: {str(e)[:150]}'
 
 
