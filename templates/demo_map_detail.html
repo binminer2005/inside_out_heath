@@ -10,11 +10,17 @@
 </div>
 {% else %}
 <a class="demo-back" href="{{ url_for('demo_maps') }}">← Danh sách người đã vẽ</a>
-<header class="demo-assessment-heading">
-  <div class="eyebrow">Hồ sơ đánh giá</div>
-  <h1 class="page-title">{{ assessment.ho_ten or 'Người tham gia' }}</h1>
-  <p class="demo-assessment-date">{{ assessment.email }} · {{ assessment.timestamp or 'Chưa rõ ngày' }}</p>
-</header>
+<div id="demoAssessmentReport" class="demo-assessment-report">
+  <header class="demo-assessment-heading">
+    <div>
+      <div class="eyebrow">Hồ sơ đánh giá</div>
+      <h1 class="page-title">{{ assessment.ho_ten or 'Người tham gia' }}</h1>
+      <p class="demo-assessment-date">{{ assessment.email }} · {{ assessment.timestamp or 'Chưa rõ ngày' }}</p>
+    </div>
+    <button id="saveAssessmentReport" class="btn btn-primary demo-save-report" type="button" data-html2canvas-ignore>
+      <span aria-hidden="true">↓</span> Lưu ảnh toàn bộ hồ sơ
+    </button>
+  </header>
 
 <div class="demo-assessment-layout">
   <section class="card demo-radar-card">
@@ -63,12 +69,14 @@
   {% endfor %}
 </div>
 {% endif %}
+</div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 {% if assessment %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
   const demoRadar = document.getElementById('demoAssessmentRadar');
   if (demoRadar) {
@@ -99,6 +107,50 @@
           pointLabels: { color: '#2C3E3A', font: { family: 'Nunito', size: 12, weight: '600' } }
         }},
         plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  const saveReportButton = document.getElementById('saveAssessmentReport');
+  const reportName = {{ (assessment.ho_ten or 'nguoi-tham-gia')|tojson }};
+  if (saveReportButton) {
+    saveReportButton.addEventListener('click', async function () {
+      const report = document.getElementById('demoAssessmentReport');
+      saveReportButton.disabled = true;
+      saveReportButton.textContent = 'Đang tạo ảnh…';
+      try {
+        await document.fonts.ready;
+        const canvas = await html2canvas(report, {
+          scale: 2,
+          backgroundColor: '#F7F4EF',
+          useCORS: true,
+          logging: false,
+          windowWidth: Math.max(document.documentElement.clientWidth, report.scrollWidth),
+          onclone: function (clonedDocument) {
+            const button = clonedDocument.getElementById('saveAssessmentReport');
+            if (button) button.remove();
+          }
+        });
+        const blob = await new Promise(function (resolve, reject) {
+          canvas.toBlob(function (result) {
+            if (result) resolve(result);
+            else reject(new Error('Không thể tạo ảnh hồ sơ.'));
+          }, 'image/png');
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const safeName = reportName.trim().replace(/[^\\p{L}\\p{N}-]+/gu, '-').replace(/^-+|-+$/g, '') || 'nguoi-tham-gia';
+        link.download = 'insideout-ho-so-' + safeName + '.png';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      } catch (error) {
+        alert('Chưa thể tạo ảnh hồ sơ. Vui lòng thử lại.');
+      } finally {
+        saveReportButton.disabled = false;
+        saveReportButton.innerHTML = '<span aria-hidden="true">↓</span> Lưu ảnh toàn bộ hồ sơ';
       }
     });
   }
