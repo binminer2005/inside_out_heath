@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Demo - {{ assessment.ho_ten if assessment else 'Không tìm thấy' }}{% endblock %}
+{% block title %}Hồ sơ {{ assessment.ho_ten if assessment else 'Không tìm thấy' }}{% endblock %}
+{% block main_class %}container demo-assessment-detail{% endblock %}
 {% block content %}
 {% if not assessment %}
 <div class="card demo-empty">
@@ -9,37 +10,98 @@
 </div>
 {% else %}
 <a class="demo-back" href="{{ url_for('demo_maps') }}">← Danh sách người đã vẽ</a>
-<div class="demo-detail-header">
-  <p class="eyebrow">Bản đồ Cân bằng Thể - Tâm</p>
-  <h1 class="page-title">{{ assessment.ho_ten }}</h1>
-  <p class="page-subtitle">{{ assessment.email }} · {{ assessment.timestamp or 'Chưa rõ ngày' }}</p>
-</div>
+<header class="demo-assessment-heading">
+  <div class="eyebrow">Hồ sơ đánh giá</div>
+  <h1 class="page-title">{{ assessment.ho_ten or 'Người tham gia' }}</h1>
+  <p class="demo-assessment-date">{{ assessment.email }} · {{ assessment.timestamp or 'Chưa rõ ngày' }}</p>
+</header>
 
-<div class="card demo-chart-card">
-  <div class="demo-chart-heading">
-    <div>
-      <div class="card-title">Biểu đồ 6 trụ cột</div>
-      <p class="demo-muted">Điểm trung bình: <strong>{{ assessment.score_avg|round(1) }}</strong> / 5</p>
+<div class="demo-assessment-layout">
+  <section class="card demo-radar-card">
+    <div class="card-title">🕸️ Bản đồ sáu trụ cột</div>
+    <p class="demo-muted">Điểm tự đánh giá theo thang từ 1 đến 5.</p>
+    <div class="demo-radar-wrap"><canvas id="demoAssessmentRadar" aria-label="Biểu đồ radar sáu trụ cột"></canvas></div>
+  </section>
+  <section class="card demo-pillar-card">
+    <div class="card-title">📊 Điểm từng trụ cột</div>
+    <div class="demo-pillar-list">
+      {% for key, label, icon in [('giac_ngu', 'Giấc ngủ', '😴'), ('dinh_duong', 'Dinh dưỡng', '🥗'), ('van_dong', 'Vận động', '🏃'), ('nhip_sinh_hoc', 'Nhịp sinh học', '⏰'), ('cam_xuc', 'Cảm xúc', '😊'), ('tinh_than', 'Tinh thần', '✨')] %}
+      {% set value = assessment.scores[key]|float %}
+      <div class="demo-pillar-row">
+        <div class="demo-pillar-label"><span>{{ icon }}</span><span>{{ label }}</span></div>
+        <div class="demo-pillar-track" aria-label="{{ label }}: {{ value|round(1) }} trên 5"><span style="width:{{ ([value, 5]|min / 5 * 100)|round }}%"></span></div>
+        <div class="demo-pillar-value">{{ value|round(1) }}</div>
+      </div>
+      {% endfor %}
+      <div class="demo-average">Điểm trung bình <strong>{{ assessment.score_avg|round(1) }}</strong><span> / 5</span></div>
     </div>
-    <a class="btn btn-primary" href="{{ assessment.chart_url }}" download="insideout-{{ assessment.ho_ten|replace(' ', '-') }}.png" target="_blank" rel="noopener">Lưu ảnh biểu đồ</a>
-  </div>
-  <img class="demo-chart-image" src="{{ assessment.chart_url }}" alt="Biểu đồ 6 trụ cột của {{ assessment.ho_ten }}">
+  </section>
 </div>
 
-<div class="card">
-  <div class="card-title">Thông tin và thông số</div>
-  <div class="demo-info-grid">
-    <div><span>Ngày sinh</span><strong>{{ assessment.dob or '—' }}</strong></div>
-    <div><span>Giới tính</span><strong>{{ assessment.gioi_tinh or '—' }}</strong></div>
-    <div><span>Tôn giáo</span><strong>{{ assessment.ton_giao or '—' }}</strong></div>
-    <div><span>Nghề nghiệp</span><strong>{{ assessment.nghe_nghiep or '—' }}</strong></div>
-    <div><span>Mục tiêu</span><strong>{{ assessment.goals or '—' }}</strong></div>
-  </div>
-  <div class="demo-score-grid">
-    {% for key, label in [('giac_ngu', 'Giấc ngủ'), ('dinh_duong', 'Dinh dưỡng'), ('van_dong', 'Vận động'), ('nhip_sinh_hoc', 'Nhịp sinh học'), ('cam_xuc', 'Cảm xúc'), ('tinh_than', 'Tinh thần')] %}
-    <div class="demo-score"><span>{{ label }}</span><strong>{{ assessment.scores[key]|round(1) }}</strong></div>
+<section class="card demo-participant-card">
+  <div class="card-title">👤 Thông tin người tham gia</div>
+  <div class="demo-participant-grid">
+    {% for key, label in [('dob', 'Ngày sinh'), ('gender', 'Giới tính'), ('phone', 'Số điện thoại'), ('email', 'Email'), ('occupation', 'Nghề nghiệp'), ('religion', 'Tôn giáo'), ('referrer', 'Người giới thiệu'), ('goals', 'Mục tiêu')] %}
+    {% if raw.get(key) %}<div><span>{{ label }}</span><strong>{{ raw.get(key) }}</strong></div>{% endif %}
     {% endfor %}
   </div>
+</section>
+
+{% if answer_sections %}
+<h2 class="demo-answer-heading">Câu trả lời theo từng mục</h2>
+<div class="demo-answer-grid">
+  {% for section in answer_sections %}
+  <section class="card demo-answer-card">
+    <div class="card-title"><span>{{ section.icon }}</span>{{ section.title }}</div>
+    {% for question in section.questions %}
+    <div class="demo-answer-row">
+      <div class="demo-answer-question">{{ question.label }}</div>
+      <div class="demo-answer-value">{{ question.answer_display }}</div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
 </div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if assessment %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const demoRadar = document.getElementById('demoAssessmentRadar');
+  if (demoRadar) {
+    new Chart(demoRadar, {
+      type: 'radar',
+      data: {
+        labels: ['Giấc ngủ', 'Dinh dưỡng', 'Vận động', 'Nhịp sinh học', 'Cảm xúc', 'Tinh thần'],
+        datasets: [{
+          label: 'Điểm (1–5)',
+          data: {{ [assessment.scores.giac_ngu, assessment.scores.dinh_duong, assessment.scores.van_dong, assessment.scores.nhip_sinh_hoc, assessment.scores.cam_xuc, assessment.scores.tinh_than]|tojson }},
+          backgroundColor: 'rgba(49, 92, 80, 0.18)',
+          borderColor: '#315C50',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#315C50',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: { r: {
+          min: 1, max: 5,
+          ticks: { stepSize: 1, backdropColor: 'transparent', color: '#8A9B97' },
+          grid: { color: 'rgba(49, 92, 80, 0.1)' },
+          angleLines: { color: 'rgba(49, 92, 80, 0.1)' },
+          pointLabels: { color: '#2C3E3A', font: { family: 'Nunito', size: 12, weight: '600' } }
+        }},
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+</script>
 {% endif %}
 {% endblock %}

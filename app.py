@@ -1354,7 +1354,37 @@ def demo_map_detail(user_email):
     )
     if not assessment:
         return render_template('demo_map_detail.html', assessment=None), 404
-    return render_template('demo_map_detail.html', assessment=assessment)
+    raw = {}
+    try:
+        raw = json.loads(assessment.get('assessment_raw_json') or '{}')
+    except (TypeError, ValueError):
+        pass
+    raw.setdefault('name', assessment.get('ho_ten', ''))
+    raw.setdefault('email', assessment.get('email', ''))
+    for source, target in (('dob', 'dob'), ('gioi_tinh', 'gender'), ('sdt', 'phone'),
+                           ('nghe_nghiep', 'occupation'), ('ton_giao', 'religion'),
+                           ('referrer', 'referrer'), ('goals', 'goals')):
+        raw.setdefault(target, assessment.get(source, ''))
+
+    answer_sections = []
+    for section in ASSESSMENT_SECTIONS:
+        if section['id'] == 'profile':
+            continue
+        questions = []
+        for question in section['questions']:
+            answer = raw.get(question['id'])
+            if answer is None or answer == '':
+                continue
+            display_answer = answer
+            for option in question.get('options', []):
+                if str(option.get('value')) == str(answer):
+                    display_answer = option.get('label', answer)
+                    break
+            questions.append({**question, 'answer_display': display_answer})
+        if questions:
+            answer_sections.append({**section, 'questions': questions})
+    return render_template('demo_map_detail.html', assessment=assessment,
+                           raw=raw, answer_sections=answer_sections)
 
 
 @app.route('/login', methods=['GET', 'POST'])
