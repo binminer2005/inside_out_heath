@@ -315,7 +315,7 @@ def build_chart_image_url(scores):
             }]
         },
         'options': {
-            'scale': {'min': 0, 'max': 5, 'ticks': {'stepSize': 1}},
+            'scale': {'min': 1, 'max': 5, 'ticks': {'stepSize': 1}},
             'plugins': {'legend': {'display': False}}
         }
     }
@@ -331,17 +331,19 @@ def _assessment_from_sheet_row(row):
     scores = {}
     for key in score_keys:
         try:
-            scores[key] = round(float(row.get(f'score_{key}') or 0), 2)
+            value = float(row.get(f'score_{key}') or 0)
+            # Older Sheets stored pillar scores as tenths (for example 26.0
+            # for 2.6/5). Convert those values back to the current 1–5 scale.
+            if value > 5:
+                value /= 10
+            scores[key] = round(max(1, min(5, value)), 1)
         except (TypeError, ValueError):
-            scores[key] = 0
+            scores[key] = 1
     row['scores'] = scores
-    row['score_avg'] = row.get('score_avg') or round(
-        sum(scores.values()) / len(score_keys), 2
-    )
+    # Recompute from normalized pillar values so legacy averages (such as 288)
+    # are shown consistently as a decimal score out of five.
+    row['score_avg'] = round(sum(scores.values()) / len(score_keys), 1)
     row['chart_url'] = build_chart_image_url(scores)
-    image_value = str(row.get('chart_image') or '')
-    if image_value.startswith('=IMAGE("') and image_value.endswith('")'):
-        row['chart_url'] = image_value[8:-2]
     return row
 
 

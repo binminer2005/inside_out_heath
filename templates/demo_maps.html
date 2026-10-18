@@ -22,7 +22,7 @@
     </div>
     <div class="demo-person-meta">
       <span class="demo-person-date">{{ item.timestamp or 'Chưa rõ ngày' }}</span>
-      <span class="demo-person-score">Điểm trung bình <strong>{{ item.score_avg }}</strong><span class="demo-score-outof"> / 5</span></span>
+      <span class="demo-person-score">Điểm trung bình <strong>{{ item.score_avg|round(1) }}</strong><span class="demo-score-outof"> / 5</span></span>
     </div>
     <span class="demo-arrow" aria-hidden="true">→</span>
   </a>

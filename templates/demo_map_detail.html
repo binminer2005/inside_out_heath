@@ -19,7 +19,7 @@
   <div class="demo-chart-heading">
     <div>
       <div class="card-title">Biểu đồ 6 trụ cột</div>
-      <p class="demo-muted">Điểm trung bình: <strong>{{ assessment.score_avg }}</strong> / 5</p>
+      <p class="demo-muted">Điểm trung bình: <strong>{{ assessment.score_avg|round(1) }}</strong> / 5</p>
     </div>
     <a class="btn btn-primary" href="{{ assessment.chart_url }}" download="insideout-{{ assessment.ho_ten|replace(' ', '-') }}.png" target="_blank" rel="noopener">Lưu ảnh biểu đồ</a>
   </div>
@@ -37,7 +37,7 @@
   </div>
   <div class="demo-score-grid">
     {% for key, label in [('giac_ngu', 'Giấc ngủ'), ('dinh_duong', 'Dinh dưỡng'), ('van_dong', 'Vận động'), ('nhip_sinh_hoc', 'Nhịp sinh học'), ('cam_xuc', 'Cảm xúc'), ('tinh_than', 'Tinh thần')] %}
-    <div class="demo-score"><span>{{ label }}</span><strong>{{ assessment.scores[key] }}</strong></div>
+    <div class="demo-score"><span>{{ label }}</span><strong>{{ assessment.scores[key]|round(1) }}</strong></div>
     {% endfor %}
   </div>
 </div>
