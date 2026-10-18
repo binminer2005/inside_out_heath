@@ -1,33 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Demo - Những người đã vẽ bản đồ{% endblock %}
+{% block main_class %}container demo-directory-container{% endblock %}
 {% block content %}
-<div class="demo-header">
+<div class="demo-header demo-directory-header">
   <div>
     <p class="eyebrow">InsideOut HEALTH · Demo</p>
     <h1 class="page-title">Những người đã vẽ bản đồ</h1>
-    <p class="page-subtitle">Dữ liệu được đọc từ tab Assessments trên Google Sheet.</p>
+    <p class="page-subtitle">Các hồ sơ bản đồ cân bằng Thể – Tâm đã hoàn thành.</p>
   </div>
-  <a class="btn btn-ghost" href="{{ url_for('assessment') }}">Vẽ bản đồ mới</a>
+  <a class="btn btn-primary" href="{{ url_for('assessment') }}">Vẽ bản đồ mới <span aria-hidden="true">→</span></a>
 </div>
 
 {% if assessments %}
-<div class="demo-list">
+<div class="demo-list demo-directory-list">
   {% for item in assessments|reverse %}
   <a class="demo-person" href="{{ url_for('demo_map_detail', user_email=item.email) }}">
     <div class="demo-person-main">
-      <strong>{{ item.ho_ten }}</strong>
+      <span class="demo-person-kicker">Hồ sơ đánh giá</span>
+      <strong>{{ item.ho_ten or 'Người tham gia' }}</strong>
       <span>{{ item.email or 'Chưa có email' }}</span>
     </div>
     <div class="demo-person-meta">
-      <span>{{ item.timestamp or 'Chưa rõ ngày' }}</span>
-      <span>Điểm TB {{ item.score_avg }}</span>
+      <span class="demo-person-date">{{ item.timestamp or 'Chưa rõ ngày' }}</span>
+      <span class="demo-person-score">Điểm trung bình <strong>{{ item.score_avg }}</strong><span class="demo-score-outof"> / 5</span></span>
     </div>
-    <span class="demo-arrow">→</span>
+    <span class="demo-arrow" aria-hidden="true">→</span>
   </a>
   {% endfor %}
 </div>
 {% else %}
-<div class="card demo-empty">
+<div class="card demo-empty demo-directory-empty">
   <div class="card-title">Chưa có dữ liệu</div>
   <p>Hãy hoàn thành một bản đồ để bản ghi xuất hiện ở đây.</p>
 </div>
