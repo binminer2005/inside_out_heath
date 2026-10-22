@@ -20,7 +20,10 @@
     <a href="{{ url_for('index') }}" class="navbar-brand">
       <img src="{{ url_for('static', filename='images/logo.png') }}" alt="InsideOut HEALTH" class="nav-logo">
     </a>
-    <div class="nav-links">
+    <button class="nav-menu-toggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="primaryNavigation">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="primaryNavigation">
       {% if session.get('user') %}
         <a href="{{ url_for('home') }}">Trang chủ</a>
         <a href="{{ url_for('checkin') }}">Check-in</a>
@@ -74,6 +77,25 @@
     </p>
   </footer>
   {% block scripts %}{% endblock %}
+  <script>
+    (function () {
+      const navbar = document.querySelector('.navbar');
+      const toggle = document.querySelector('.nav-menu-toggle');
+      if (!navbar || !toggle) return;
+      toggle.addEventListener('click', function () {
+        const isOpen = navbar.classList.toggle('menu-open');
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        toggle.setAttribute('aria-label', isOpen ? 'Đóng menu' : 'Mở menu');
+      });
+      navbar.querySelectorAll('.nav-links a').forEach(function (link) {
+        link.addEventListener('click', function () {
+          navbar.classList.remove('menu-open');
+          toggle.setAttribute('aria-expanded', 'false');
+          toggle.setAttribute('aria-label', 'Mở menu');
+        });
+      });
+    })();
+  </script>
   <script>
     document.querySelectorAll('.flash').forEach(function (message) {
       window.setTimeout(function () {

@@ -98,40 +98,55 @@ h1, h2, h3 { font-weight: 700; line-height: 1.25; color: var(--text); }
   color: var(--text-muted);
 }
 .nav-links a:not(.btn):hover { color: var(--forest); }
+.nav-menu-toggle {
+  display: none;
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+.nav-menu-toggle span { display: block; width: 100%; height: 2px; border-radius: 2px; background: var(--forest); }
 
 @media (max-width: 520px) {
   .navbar {
-    flex-wrap: nowrap;
-    gap: .55rem;
-    padding: .45rem .65rem;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: .35rem;
+    padding: .45rem .75rem;
   }
   .navbar-brand { flex: 0 0 auto; }
   .nav-logo { height: 32px; }
+  .nav-menu-toggle { display: flex; }
   .nav-links {
-    flex: 1 1 auto;
+    display: none;
+    flex: 1 0 100%;
+    width: 100%;
     min-width: 0;
-    justify-content: flex-start;
-    gap: .1rem;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    padding: .1rem 0;
+    align-items: stretch;
+    flex-direction: column;
+    gap: .15rem;
+    padding: .35rem 0 .2rem;
+    border-top: 1px solid var(--border);
   }
-  .nav-links::-webkit-scrollbar { display: none; }
+  .navbar.menu-open .nav-links { display: flex; }
   .nav-links a:not(.btn) {
-    display: inline-flex;
-    flex: 0 0 auto;
+    display: flex;
     align-items: center;
-    min-height: 32px;
-    padding: .3rem .38rem;
-    border-radius: 8px;
-    font-size: .72rem;
+    min-height: 40px;
+    padding: .45rem .65rem;
+    border-radius: 9px;
+    font-size: .88rem;
   }
   .nav-links a:not(.btn):active,
   .nav-links a:not(.btn):focus-visible { background: var(--primary-light); }
-  .nav-links .btn { flex: 0 0 auto; padding: .35rem .55rem; font-size: .72rem; }
+  .nav-links .btn { align-self: flex-start; margin-top: .2rem; padding: .45rem .8rem; font-size: .85rem; }
   .brand-text { font-size: 0.95rem; }
 }
 
